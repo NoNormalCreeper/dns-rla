@@ -1,0 +1,98 @@
+#include "relay_state.h"
+
+#include <string.h>
+
+void relay_state_init(relay_state_t* state) {
+    /* 固定数组全部清零即可表示没有任何 pending 请求。 */
+    memset(state, 0, sizeof(*state));
+
+    /* DNS ID 0 也合法，但从 1 开始便于调试和日志阅读。 */
+    state->next_id = 1;
+}
+
+uint16_t relay_state_next_id(relay_state_t* state) {
+    uint16_t id = state->next_id++;
+
+    /*
+     * uint16_t 溢出会回到 0。
+     * 当前简单跳过 0；后续还要检查 id 是否已经在 pending 表中使用。
+     */
+    if (state->next_id == 0) {
+        state->next_id = 1;
+    }
+
+    return id;
+}
+
+int relay_state_add(relay_state_t* state,
+                    uint16_t forward_id,
+                    uint16_t client_id,
+                    const struct sockaddr* client_addr,
+                    socklen_t client_addr_len) {
+    size_t i;
+
+    /*
+     * 使用固定数组的好处是逻辑简单、无需额外释放。
+     * 缺点是满表时只能返回错误，调用方应记录日志或丢弃请求。
+     */
+    for (i = 0; i < DNS_RELAY_MAX_PENDING; i++) {
+        pending_query_t* slot = &state->pending[i];
+
+        if (!slot->in_use) {
+            /*
+             * 保存原客户端地址和原始 ID。
+             * 外部 DNS 响应回来时，只会带 forward_id，不会知道客户端是谁。
+             */
+            slot->in_use = 1;
+            slot->forward_id = forward_id;
+            slot->client_id = client_id;
+            slot->client_addr_len = client_addr_len;
+            slot->created_at = time(NULL);
+            memcpy(&slot->client_addr, client_addr, client_addr_len);
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+pending_query_t* relay_state_find(relay_state_t* state, uint16_t forward_id) {
+    size_t i;
+
+    /* 外部 DNS 回包 ID 等于 forward_id，用它找回原客户端。 */
+    for (i = 0; i < DNS_RELAY_MAX_PENDING; i++) {
+        if (state->pending[i].in_use &&
+            state->pending[i].forward_id == forward_id) {
+            return &state->pending[i];
+        }
+    }
+
+    return NULL;
+}
+
+void relay_state_remove(relay_state_t* state, uint16_t forward_id) {
+    pending_query_t* query = relay_state_find(state, forward_id);
+
+    /* 清零后该槽位可被下一条请求复用。 */
+    if (query != NULL) {
+        memset(query, 0, sizeof(*query));
+    }
+}
+
+void relay_state_expire(relay_state_t* state, time_t now) {
+    size_t i;
+
+    /*
+     * UDP 可能丢包，上游 DNS 也可能不响应。
+     * 超时清理能避免 pending 表永久占用。
+     */
+    for (i = 0; i < DNS_RELAY_MAX_PENDING; i++) {
+        pending_query_t* query = &state->pending[i];
+
+        if (query->in_use &&
+            now - query->created_at > DNS_RELAY_PENDING_TIMEOUT_SEC) {
+            /* 迟到响应回来后会查不到该记录，net_loop 应丢弃它。 */
+            memset(query, 0, sizeof(*query));
+        }
+    }
+}
