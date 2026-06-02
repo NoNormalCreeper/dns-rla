@@ -379,6 +379,74 @@ relay_state_expire(&state, time(NULL));
 
 如果外部 DNS 响应迟到，pending 表已经没有对应记录，就丢弃响应。
 
+## 测试规划与 TDD 指引
+
+当前 CI 会在 push 和 pull request 时执行格式检查、静态分析、Linux 构建、普通单元测试和 sanitizer 测试。现有测试还很薄，只能覆盖域名表加载/查找和 DNS ID 读写；后续实现协议功能时，应先补测试，再写生产代码。
+
+### 当前测试覆盖
+
+- `test_hosts_table`：加载域名表、跳过非法行、大小写无关查询、普通 IP 命中、`0.0.0.0` 拦截命中和未命中。
+- `test_dns_packet`：读取 DNS ID、改写 DNS ID、短包保护，并确认改 ID 时不会修改报文其它字节。
+
+这些测试只能守住骨架行为，不能证明 DNS Question 解析、响应构造或 UDP 中继逻辑正确。特别是 sanitizer 只有在测试跑到危险路径时才有价值，因此后续畸形包测试必须跟上。
+
+### 后续必须补的测试
+
+1. `dns_packet_parse_question()`
+   - 使用固定二进制查询包，例如 `www.example.com A IN`，断言 `id`、`qname`、`qtype`、`qclass`。
+   - 报文短于 `DNS_HEADER_SIZE` 时必须失败。
+   - `QDCOUNT=0` 必须失败；`QDCOUNT>=1` 时可先只解析第一个 Question。
+   - QNAME 缺少结尾 `0`、标签长度越过包尾、缺少 `QTYPE`、缺少 `QCLASS` 时必须失败，且不能越界读。
+   - 标签长度超过 63 字节、解码后的点分域名超过 `DNS_MAX_DOMAIN_LEN` 时必须失败。
+   - 最小版本遇到 QNAME 压缩指针应失败；如果后续决定支持压缩指针，必须先补对应测试。
+
+2. `dns_packet_build_a_response()`
+   - 使用同一个合法查询包作为输入。
+   - 断言响应保留原始 ID 和原始 Question。
+   - 断言 Header 字段：`QR=1`、`RCODE=0`、`QDCOUNT=1`、`ANCOUNT=1`、`NSCOUNT=0`、`ARCOUNT=0`。
+   - 断言 Answer 字段：`NAME=0xC00C`、`TYPE=A`、`CLASS=IN`、预期 TTL、`RDLENGTH=4`，以及 `inet_pton()` 产出的 IPv4 RDATA 字节。
+   - `response_capacity` 太小时必须返回 `-1`，且不能报告成功的 `response_len`。
+
+3. `dns_packet_build_nxdomain_response()`
+   - 使用同一个合法查询包作为输入。
+   - 断言响应保留原始 ID 和原始 Question。
+   - 断言 Header 字段：`QR=1`、`RCODE=3`、`QDCOUNT=1`、`ANCOUNT=0`、`NSCOUNT=0`、`ARCOUNT=0`。
+   - 容量不足时应采用和 A 响应构造相同的失败约定。
+
+4. `hosts_table`
+   - 文件不存在时返回 `-1`，并且表对象后续仍可安全释放或重新加载。
+   - 重复域名返回第一条加载的记录。
+   - 超过 128 条有效记录时能触发动态数组扩容。
+   - 超长域名 token 要有明确策略：要么拒绝，要么安全截断；生产代码和测试必须保持一致。
+
+5. `net_loop` 集成测试
+   - 等 `net_loop` 支持非特权测试端口后，添加 UDP 客户端测试，向 `127.0.0.1:5353` 发送 DNS 查询。
+   - 至少覆盖三条路径：本地普通 A 记录命中、本地 `0.0.0.0` 拦截返回 NXDOMAIN、表内未命中并转发到上游测试替身。
+
+### TDD 操作顺序
+
+每个行为用一个小的 RED-GREEN-REFACTOR 循环完成：
+
+1. RED：先在对应测试文件里加一个聚焦断言，运行 `make -B test`，确认它因为预期原因失败。
+2. GREEN：只写足够让这个测试通过的生产代码，不顺手加未测试的协议功能。
+3. REFACTOR：所有测试变绿后再清理重复的字节读写 helper、命名或局部结构。
+4. VERIFY：进入下一个行为前，运行普通严格测试和 sanitizer 测试。
+
+推荐验证命令：
+
+```bash
+make test CFLAGS="-std=c11 -Wall -Wextra -pedantic -Werror -Iinclude"
+
+ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=print_stacktrace=1 \
+make test \
+  CFLAGS="-std=c11 -Wall -Wextra -pedantic -Werror -g -O1 -fsanitize=address,undefined -Iinclude" \
+  LDFLAGS="-fsanitize=address,undefined"
+```
+
+DNS 报文测试优先使用固定字节 fixture，不要 mock 协议行为。测试应通过 `include/dns_packet.h` 里的公开函数观察结果：解析函数断言解码字段，响应构造函数断言关键字段或精确响应字节。除非 helper 进入公开接口，否则不要测试私有 helper。
+
+对畸形包，先定义失败约定再实现：返回 `-1`，不越界读写，输出结构或输出 buffer 处于调用方可以安全忽略的状态。sanitizer 测试在这些负向用例存在后才会真正有用。
+
 ## 建议的职责分工
 
 三人开发时可以这样分：
