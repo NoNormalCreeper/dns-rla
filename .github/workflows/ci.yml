@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CCACHE_DISABLE: "1"
+
+jobs:
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Check C formatting
+        run: clang-format --dry-run --Werror src/*.c include/*.h tests/*.c
+
+  lint:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck
+        run: cppcheck --enable=warning,style,performance,portability --std=c11 --error-exitcode=1 src include tests
+
+  build-linux:
+    name: Linux build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build with warnings as errors
+        run: make clean && make CFLAGS="-std=c11 -Wall -Wextra -pedantic -Werror -Iinclude"
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run unit tests
+        run: make clean && make test CFLAGS="-std=c11 -Wall -Wextra -pedantic -Werror -Iinclude"
+
+  sanitizer-test:
+    name: Sanitizer tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run ASan and UBSan tests
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: |
+          make clean
+          make test \
+            CFLAGS="-std=c11 -Wall -Wextra -pedantic -Werror -g -O1 -fsanitize=address,undefined -Iinclude" \
+            LDFLAGS="-fsanitize=address,undefined"

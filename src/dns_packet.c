@@ -13,11 +13,10 @@ uint16_t dns_packet_get_id(const unsigned char* packet, size_t packet_len) {
         return 0;
     }
 
-    
     /* 提醒：后续如果要解析 QDCOUNT、QTYPE、QCLASS、TTL、RDLENGTH，建议用 socket
      * 相关的字节序函数统一改成 read_u16/write_u16/read_u32/write_u32 这种
      * helper，而不是手写转换 */
-     
+
     /* 网络字节序是大端：高 8 位在前，低 8 位在后。 */
     id = ((uint16_t)packet[0] << 8) | packet[1];
     return id;

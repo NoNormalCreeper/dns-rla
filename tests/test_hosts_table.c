@@ -6,13 +6,16 @@
 
 static void write_fixture(const char* path) {
     FILE* fp = fopen(path, "w");
+    int close_result;
+
     assert(fp != NULL);
 
     fputs("192.0.2.10 Example.COM\n", fp);
     fputs("0.0.0.0 blocked.test\n", fp);
     fputs("not-an-ip ignored.test\n", fp);
 
-    assert(fclose(fp) == 0);
+    close_result = fclose(fp);
+    assert(close_result == 0);
 }
 
 int main(void) {
