@@ -1,0 +1,5 @@
+build/
+dnsrelay
+compile_commands.json
+.vscode/
+.cache/
