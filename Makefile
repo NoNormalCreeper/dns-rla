@@ -1,11 +1,17 @@
-# 固定使用真实 gcc，避免当前环境的 ccache 包装器写入只读缓存目录。
-CC := /usr/bin/gcc
+ifeq ($(origin CC),default)
+CC := gcc
+endif
+
+EXEEXT ?=
+ifeq ($(OS),Windows_NT)
+EXEEXT := .exe
+endif
 
 # -std=c11：使用 C11；-Wall/-Wextra/-pedantic：尽早暴露潜在问题。
 CFLAGS ?= -std=c11 -Wall -Wextra -pedantic -Iinclude
 LDFLAGS ?=
 
-TARGET := dnsrelay
+TARGET := dnsrelay$(EXEEXT)
 
 # 自动收集 src 下所有 .c 文件，新增模块后通常不用改 Makefile。
 SRC := $(wildcard src/*.c)
