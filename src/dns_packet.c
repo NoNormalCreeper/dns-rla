@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 
+#include <ctype.h>
 #include <string.h>
 
 /*
@@ -63,9 +64,9 @@ int dns_packet_set_id(ubyte* packet, size_t packet_len, uint16_t id) {
     return 0;
 }
 
-int dns_packet_parse_question(const ubyte* packet,
-                              size_t packet_len,
-                              dns_question_t* question) {
+int dns_packet_parse_query(const ubyte* packet,
+                           size_t packet_len,
+                           dns_query_t* query) {
     /*
      * 后续实现步骤：
      * 1. 检查 packet_len >= DNS_HEADER_SIZE。
@@ -80,9 +81,54 @@ int dns_packet_parse_question(const ubyte* packet,
      * - 为了安全，解析时遇到长度越界、域名超过 255 字节、缺少结尾 0
      * 都应返回错误。
      */
-    (void)packet;
-    (void)packet_len;
-    (void)question;
+
+    /* TODO: 错误检查 */
+
+    /* 暂未考虑压缩指针 */
+    uint16_t qdcount;
+    const ubyte* readp;
+    char* writep;
+    char* p;
+    int is_first_part;
+
+    /* id 成员 */
+    query->id = dns_packet_get_id(packet, packet_len);
+
+    /* qname 成员 */
+    memset(query->qname, 0, sizeof query->qname);
+    qdcount = dns_packet_read_u16(packet + 4);
+
+    if (!(qdcount >= 1)) {
+        return -1;
+    }
+
+    readp = packet + 12;
+    writep = query->qname;
+    is_first_part = 1;
+
+    while (*readp != (ubyte)0x00) {
+        size_t len;
+        len = *readp++;
+        if (is_first_part) {
+            is_first_part = 0;
+        } else {
+            *writep++ = '.';
+        }
+        memcpy(writep, readp, len);
+        readp += len;
+        writep += len;
+    }
+
+    /* 对网址做规范化（转小写） */
+    for (p = query->qname; *p != '\0'; ++p) {
+        *p = tolower(*p);
+    }
+
+    /* qtype 和 qclass 成员 */
+    ++readp;
+    query->qtype = dns_packet_read_u16(readp);
+    query->qclass = dns_packet_read_u16(readp + 2);
+
     return -1;
 }
 

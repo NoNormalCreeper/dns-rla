@@ -30,6 +30,7 @@ typedef unsigned char ubyte;
 #define DNS_RCODE_NOERROR 0
 #define DNS_RCODE_NXDOMAIN 3
 
+/* query = question + id */
 typedef struct {
     /* DNS Header 里的事务 ID。响应必须带回客户端原 ID。 */
     uint16_t id;
@@ -42,7 +43,7 @@ typedef struct {
 
     /* 查询类，绝大多数普通互联网查询是 IN=1。 */
     uint16_t qclass;
-} dns_question_t;
+} dns_query_t;
 
 /*
  * 读取 DNS Header 的 ID 字段。
@@ -75,9 +76,9 @@ int dns_packet_set_id(ubyte* packet, size_t packet_len, uint16_t id);
  *
  * 解析时必须做边界检查，防止错误报文导致越界读。
  */
-int dns_packet_parse_question(const ubyte* packet,
-                              size_t packet_len,
-                              dns_question_t* question);
+int dns_packet_parse_query(const ubyte* packet,
+                           size_t packet_len,
+                           dns_query_t* question);
 
 /*
  * 构造本地命中普通 IP 时的 A 记录响应。
