@@ -13,7 +13,7 @@ int net_loop_run(const relay_config_t* config,
      * 2. 创建上游 socket，负责和 config->upstream_dns:53 通信。
      * 3. 用 select() 同时监听两个 socket，避免阻塞等待某个外部 DNS 响应。
      * 4. 收到客户端查询：
-     *    - dns_packet_parse_question() 解析域名和类型。
+     *    - dns_packet_parse_query() 解析域名和类型。
      *    - hosts_table_lookup() 查静态表。
      *    - 命中普通 IP：构造 A 响应并 sendto() 回客户端。
      *    - 命中 0.0.0.0：构造 NXDOMAIN 响应并 sendto() 回客户端。

@@ -15,7 +15,7 @@ The first tests are intentionally small:
 
 Next useful extensions:
 
-1. Add `dns_packet_parse_question()` tests using a fixed binary query for
+1. Add `dns_packet_parse_question()` (now `dns_packet_parse_query()`) tests using a fixed binary query for
    `www.example.com A IN`, plus malformed packets that must fail safely.
 2. Add `dns_packet_build_a_response()` tests that assert `QR=1`, `RCODE=0`,
    `QDCOUNT=1`, `ANCOUNT=1`, the original ID, and the expected IPv4 RDATA.

@@ -190,7 +190,7 @@ dnsrelay [-d|-dd] [dns-server-ipaddr] [filename]
 
 当前还是占位：
 
-- `dns_packet_parse_question()`
+- `dns_packet_parse_question()` (已更名为 `dns_packet_parse_query()`)
 - `dns_packet_build_a_response()`
 - `dns_packet_build_nxdomain_response()`
 
@@ -260,7 +260,7 @@ dnsrelay [-d|-dd] [dns-server-ipaddr] [filename]
 
 目标函数：
 
-- `dns_packet_parse_question()`
+- `dns_packet_parse_question()` (已更名为 `dns_packet_parse_query()`)
 
 要做的事：
 
@@ -270,7 +270,7 @@ dnsrelay [-d|-dd] [dns-server-ipaddr] [filename]
 - 从偏移 12 开始解析 QNAME。
 - 把长度标签格式转成普通域名字符串。
 - 读取 QTYPE 和 QCLASS。
-- 填充 `dns_question_t`。
+- 填充 `dns_question_t` (已更名为 `dns_query_t`)。
 
 完成后可以写一个临时小测试，或者先在后续 Socket 收包后打印域名。
 
@@ -285,7 +285,7 @@ dnsrelay [-d|-dd] [dns-server-ipaddr] [filename]
 - 创建 UDP socket。
 - 绑定一个非 53 端口，例如 5353，避免权限问题。
 - `recvfrom()` 收包。
-- 调用 `dns_packet_parse_question()`。
+- 调用 `dns_packet_parse_question()` (已更名为 `dns_packet_parse_query()`)。
 - 打印客户端地址、DNS ID、域名、QTYPE、QCLASS。
 
 验证方式可以用：
@@ -392,7 +392,7 @@ relay_state_expire(&state, time(NULL));
 
 ### 后续必须补的测试
 
-1. `dns_packet_parse_question()`
+1. `dns_packet_parse_question()` (已更名为 `dns_packet_parse_query()`)
    - 使用固定二进制查询包，例如 `www.example.com A IN`，断言 `id`、`qname`、`qtype`、`qclass`。
    - 报文短于 `DNS_HEADER_SIZE` 时必须失败。
    - `QDCOUNT=0` 必须失败；`QDCOUNT>=1` 时可先只解析第一个 Question。
