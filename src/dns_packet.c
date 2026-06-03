@@ -2,7 +2,42 @@
 
 #include <arpa/inet.h>
 
-uint16_t dns_packet_get_id(const unsigned char* packet, size_t packet_len) {
+#include <string.h>
+
+/*
+ * 网络字节序是大端序，但既然可以使用 arpa/inet.h，
+ * 那么可以直接使用其中的字节序转换函数，以免手动拼拆字节。
+ */
+
+static uint16_t dns_packet_read_u16(const ubyte* start) {
+    /*
+     * 使用 memcpy，
+     * 避免其他操作（如使用 union、指针 cast）可能引发的未定义行为。
+     */
+    uint16_t buf;
+    memcpy(&buf, start, sizeof buf);
+    return ntohs(buf);
+}
+
+static uint32_t dns_packet_read_u32(const ubyte* start) {
+    uint32_t buf;
+    memcpy(&buf, start, sizeof buf);
+    return ntohl(buf);
+}
+
+static void dns_packet_write_u16(ubyte* start, uint16_t val) {
+    uint16_t buf;
+    buf = htons(val);
+    memcpy(start, &buf, sizeof buf);
+}
+
+static void dns_packet_write_u32(ubyte* start, uint32_t val) {
+    uint32_t buf;
+    buf = htonl(val);
+    memcpy(start, &buf, sizeof buf);
+}
+
+uint16_t dns_packet_get_id(const ubyte* packet, size_t packet_len) {
     uint16_t id;
 
     /*
@@ -13,28 +48,22 @@ uint16_t dns_packet_get_id(const unsigned char* packet, size_t packet_len) {
         return 0;
     }
 
-    /* 提醒：后续如果要解析 QDCOUNT、QTYPE、QCLASS、TTL、RDLENGTH，建议用 socket
-     * 相关的字节序函数统一改成 read_u16/write_u16/read_u32/write_u32 这种
-     * helper，而不是手写转换 */
-
-    /* 网络字节序是大端：高 8 位在前，低 8 位在后。 */
-    id = ((uint16_t)packet[0] << 8) | packet[1];
-    return id;
+    /* 使用了专门的、能够正确处理字节序的 u16 读取函数 */
+    return dns_packet_read_u16(packet);
 }
 
-int dns_packet_set_id(unsigned char* packet, size_t packet_len, uint16_t id) {
+int dns_packet_set_id(ubyte* packet, size_t packet_len, uint16_t id) {
     /* 改写 ID 前也必须检查长度，避免收到短包时越界写。 */
     if (packet_len < 2) {
         return -1;
     }
 
-    /* 手动拆成两个字节，避免依赖主机端序。 */
-    packet[0] = (unsigned char)((id >> 8) & 0xff);
-    packet[1] = (unsigned char)(id & 0xff);
+    /* 使用了专门的、能够正确处理字节序的 u16 写入函数 */
+    dns_packet_write_u16(packet, id);
     return 0;
 }
 
-int dns_packet_parse_question(const unsigned char* packet,
+int dns_packet_parse_question(const ubyte* packet,
                               size_t packet_len,
                               dns_question_t* question) {
     /*
@@ -57,10 +86,10 @@ int dns_packet_parse_question(const unsigned char* packet,
     return -1;
 }
 
-int dns_packet_build_a_response(const unsigned char* query,
+int dns_packet_build_a_response(const ubyte* query,
                                 size_t query_len,
                                 uint32_t ipv4_network_order,
-                                unsigned char* response,
+                                ubyte* response,
                                 size_t response_capacity,
                                 size_t* response_len) {
     /*
@@ -89,9 +118,9 @@ int dns_packet_build_a_response(const unsigned char* query,
     return -1;
 }
 
-int dns_packet_build_nxdomain_response(const unsigned char* query,
+int dns_packet_build_nxdomain_response(const ubyte* query,
                                        size_t query_len,
-                                       unsigned char* response,
+                                       ubyte* response,
                                        size_t response_capacity,
                                        size_t* response_len) {
     /*

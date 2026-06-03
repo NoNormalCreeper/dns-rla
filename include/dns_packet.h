@@ -4,6 +4,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* 类型别名避免代码过于冗长 */
+typedef unsigned char ubyte;
+
 /* DNS Header 固定 12 字节：ID、Flags、QDCOUNT、ANCOUNT、NSCOUNT、ARCOUNT。 */
 #define DNS_HEADER_SIZE 12
 
@@ -47,7 +50,7 @@ typedef struct {
  * DNS 报文字段是网络字节序，也就是大端序。ID 位于报文第 0、1 字节。
  * 这里手动拼接两个字节，比直接强转结构体更安全，避免对齐和端序问题。
  */
-uint16_t dns_packet_get_id(const unsigned char* packet, size_t packet_len);
+uint16_t dns_packet_get_id(const ubyte* packet, size_t packet_len);
 
 /*
  * 改写 DNS Header 的 ID 字段。
@@ -56,7 +59,7 @@ uint16_t dns_packet_get_id(const unsigned char* packet, size_t packet_len);
  *   客户端原 ID -> 本程序生成的新 forward_id -> 外部 DNS
  * 外部响应回来后，再改回客户端原 ID。
  */
-int dns_packet_set_id(unsigned char* packet, size_t packet_len, uint16_t id);
+int dns_packet_set_id(ubyte* packet, size_t packet_len, uint16_t id);
 
 /*
  * 解析 DNS 查询报文中的第一个 Question。
@@ -72,7 +75,7 @@ int dns_packet_set_id(unsigned char* packet, size_t packet_len, uint16_t id);
  *
  * 解析时必须做边界检查，防止错误报文导致越界读。
  */
-int dns_packet_parse_question(const unsigned char* packet,
+int dns_packet_parse_question(const ubyte* packet,
                               size_t packet_len,
                               dns_question_t* question);
 
@@ -86,10 +89,10 @@ int dns_packet_parse_question(const unsigned char* packet,
  * Answer 的 NAME 可使用压缩指针 0xC00C，指向报文偏移 12 处的原 QNAME。
  * 这是 DNS 实现里常见 trick：不用重复写一遍域名，响应更短。
  */
-int dns_packet_build_a_response(const unsigned char* query,
+int dns_packet_build_a_response(const ubyte* query,
                                 size_t query_len,
                                 uint32_t ipv4_network_order,
-                                unsigned char* response,
+                                ubyte* response,
                                 size_t response_capacity,
                                 size_t* response_len);
 
@@ -99,9 +102,9 @@ int dns_packet_build_a_response(const unsigned char* query,
  * PPT 要求表中命中 0.0.0.0 时返回“域名不存在”，不要返回 0.0.0.0 的 A 记录。
  * 因此这里应设置 QR=1、RCODE=3、ANCOUNT=0，并保留原 Question。
  */
-int dns_packet_build_nxdomain_response(const unsigned char* query,
+int dns_packet_build_nxdomain_response(const ubyte* query,
                                        size_t query_len,
-                                       unsigned char* response,
+                                       ubyte* response,
                                        size_t response_capacity,
                                        size_t* response_len);
 

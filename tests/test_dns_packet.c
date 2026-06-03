@@ -4,9 +4,9 @@
 #include <string.h>
 
 int main(void) {
-    unsigned char packet[] = {0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00};
-    unsigned char original_tail[sizeof(packet) - 2];
-    unsigned char too_short[1] = {0};
+    ubyte packet[] = {0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00};
+    ubyte original_tail[sizeof(packet) - 2];
+    ubyte too_short[1] = {0};
 
     memcpy(original_tail, packet + 2, sizeof(original_tail));
 
