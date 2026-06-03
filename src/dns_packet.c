@@ -19,7 +19,7 @@ static uint16_t dns_packet_read_u16(const ubyte* start) {
     return ntohs(buf);
 }
 
-static uint32_t dns_packet_read_u32(const ubyte* start) {
+__attribute__((unused)) static uint32_t dns_packet_read_u32(const ubyte* start) {
     uint32_t buf;
     memcpy(&buf, start, sizeof buf);
     return ntohl(buf);
@@ -31,15 +31,13 @@ static void dns_packet_write_u16(ubyte* start, uint16_t val) {
     memcpy(start, &buf, sizeof buf);
 }
 
-static void dns_packet_write_u32(ubyte* start, uint32_t val) {
+__attribute__((unused)) static void dns_packet_write_u32(ubyte* start, uint32_t val) {
     uint32_t buf;
     buf = htonl(val);
     memcpy(start, &buf, sizeof buf);
 }
 
 uint16_t dns_packet_get_id(const ubyte* packet, size_t packet_len) {
-    uint16_t id;
-
     /*
      * DNS ID 在报文开头两个字节。
      * 长度不够说明这不是合法 DNS Header，骨架里返回 0 作为安全默认值。
