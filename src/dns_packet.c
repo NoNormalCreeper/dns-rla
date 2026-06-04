@@ -42,10 +42,13 @@ __attribute__((unused)) static void dns_packet_write_u32(ubyte* start,
 
 /* 例如 count = 5 时返回的数值是 0b0000'0000'0001'1111 */
 static uint16_t dns_packet_ones_16(size_t count) {
-    return ~((~(uint16_t)0) << count);
+    return ~((uint16_t)(~0) << count);
 }
 
-static uint16_t dns_packet_flags_modify(uint16_t flags, size_t bit_index, size_t bit_length, uint16_t val) {
+static uint16_t dns_packet_flags_modify(uint16_t flags,
+                                        size_t bit_index,
+                                        size_t bit_length,
+                                        uint16_t val) {
     uint16_t src_keep;
     uint16_t dest_keep;
 
@@ -55,7 +58,8 @@ static uint16_t dns_packet_flags_modify(uint16_t flags, size_t bit_index, size_t
     return (flags & dest_keep) | ((val & src_keep) << bit_index);
 }
 
-static uint16_t dns_packet_flags_get(uint16_t flags, size_t bit_index, size_t bit_length) {
+__attribute__((unused)) static uint16_t
+dns_packet_flags_get(uint16_t flags, size_t bit_index, size_t bit_length) {
     return (flags >> bit_index) & dns_packet_ones_16(bit_length);
 }
 
@@ -188,9 +192,12 @@ int dns_packet_build_a_response(const ubyte* query,
 
     memcpy(response, query, DNS_HEADER_SIZE);
     flags = dns_packet_read_u16(query + DNS_FLAGS_INDEX);
-    flags = dns_packet_flags_modify(flags, DNS_FLAGS_QR_BIT_INDEX, DNS_FLAGS_QR_BIT_SIZE, 1);
-    flags = dns_packet_flags_modify(flags, DNS_FLAGS_RA_BIT_INDEX, DNS_FLAGS_RA_BIT_SIZE, 1);
-    flags = dns_packet_flags_modify(flags, DNS_FLAGS_RCODE_BIT_INDEX, DNS_FLAGS_RCODE_BIT_SIZE, 0);
+    flags = dns_packet_flags_modify(flags, DNS_FLAGS_QR_BIT_INDEX,
+                                    DNS_FLAGS_QR_BIT_SIZE, 1);
+    flags = dns_packet_flags_modify(flags, DNS_FLAGS_RA_BIT_INDEX,
+                                    DNS_FLAGS_RA_BIT_SIZE, 1);
+    flags = dns_packet_flags_modify(flags, DNS_FLAGS_RCODE_BIT_INDEX,
+                                    DNS_FLAGS_RCODE_BIT_SIZE, 0);
     dns_packet_write_u16(response + DNS_FLAGS_INDEX, flags);
     dns_packet_write_u16(response + DNS_QDCOUNT_INDEX, 1);
     dns_packet_write_u16(response + DNS_ANCOUNT_INDEX, 1);
