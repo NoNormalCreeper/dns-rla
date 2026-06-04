@@ -64,22 +64,22 @@ uint16_t dns_packet_get_id(const ubyte* packet, size_t packet_len) {
      * DNS ID 在报文开头两个字节。
      * 长度不够说明这不是合法 DNS Header，骨架里返回 0 作为安全默认值。
      */
-    if (packet_len < 2) {
+    if (packet_len < DNS_ID_INDEX + 2) {
         return 0;
     }
 
     /* 使用了专门的、能够正确处理字节序的 u16 读取函数 */
-    return dns_packet_read_u16(packet);
+    return dns_packet_read_u16(packet + DNS_ID_INDEX);
 }
 
 int dns_packet_set_id(ubyte* packet, size_t packet_len, uint16_t id) {
     /* 改写 ID 前也必须检查长度，避免收到短包时越界写。 */
-    if (packet_len < 2) {
+    if (packet_len < DNS_ID_INDEX + 2) {
         return -1;
     }
 
     /* 使用了专门的、能够正确处理字节序的 u16 写入函数 */
-    dns_packet_write_u16(packet, id);
+    dns_packet_write_u16(packet + DNS_ID_INDEX, id);
     return 0;
 }
 
@@ -103,7 +103,7 @@ int dns_packet_parse_query(const ubyte* packet,
 
     /* TODO: 错误检查 */
 
-    /* 暂未考虑压缩指针 */
+    /* TODO: 暂未考虑压缩指针 */
     uint16_t qdcount;
     const ubyte* readp;
     char* writep;
@@ -115,13 +115,13 @@ int dns_packet_parse_query(const ubyte* packet,
 
     /* qname 成员 */
     memset(query->qname, 0, sizeof query->qname);
-    qdcount = dns_packet_read_u16(packet + 4);
+    qdcount = dns_packet_read_u16(packet + DNS_QDCOUNT_INDEX);
 
     if (!(qdcount >= 1)) {
         return -1;
     }
 
-    readp = packet + 12;
+    readp = packet + DNS_HEADER_SIZE;
     writep = query->qname;
     is_first_part = 1;
 
