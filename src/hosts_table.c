@@ -1,20 +1,11 @@
 #include "hosts_table.h"
+#include "common.h"
 
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-static void normalize_domain(char* domain) {
-    /*
-     * DNS 域名匹配通常不区分大小写。
-     * 静态表里存在 www.X.com / WWW.X.com 这类大小写混合项，统一小写后再比较。
-     */
-    for (; *domain != '\0'; domain++) {
-        *domain = (char)tolower((unsigned char)*domain);
-    }
-}
 
 static int ensure_capacity(hosts_table_t* table) {
     hosts_entry_t* new_entries;
@@ -32,8 +23,8 @@ static int ensure_capacity(hosts_table_t* table) {
     new_capacity = table->capacity == 0 ? 128 : table->capacity * 2;
     new_entries = (hosts_entry_t*)realloc(table->entries,
                                           new_capacity * sizeof(*new_entries));
-    //realloc用于扩充表
-        if (new_entries == NULL) {
+    // realloc用于扩充表
+    if (new_entries == NULL) {
         return -1;
     }
 

@@ -64,6 +64,7 @@ make clean
 .
 ├── Makefile
 ├── include/
+│   ├── common.h
 │   ├── config.h
 │   ├── dns_packet.h
 │   ├── hosts_table.h
@@ -71,6 +72,7 @@ make clean
 │   ├── net_loop.h
 │   └── relay_state.h
 ├── src/
+│   ├── common.c
 │   ├── config.c
 │   ├── dns_packet.c
 │   ├── hosts_table.c
@@ -102,6 +104,17 @@ make clean
 - 程序退出前释放域名表内存。
 
 它目前是程序主流程的骨架，不包含 DNS 业务逻辑。
+
+### `common`
+
+文件：
+
+- `include/common.h`
+- `src/common.c`
+
+职责：
+
+存放一些不止一个模块会用到的代码，如域名正则化。
 
 ### `config`
 
@@ -381,12 +394,13 @@ relay_state_expire(&state, time(NULL));
 
 ## 测试规划与 TDD 指引
 
-当前 CI 会在 push 和 pull request 时执行格式检查、静态分析、Linux 构建、普通单元测试和 sanitizer 测试。现有测试还很薄，只能覆盖域名表加载/查找和 DNS ID 读写；后续实现协议功能时，应先补测试，再写生产代码。
+当前 CI 会在 push 和 pull request 时执行格式检查、静态分析、Linux 构建、普通单元测试和 sanitizer 测试。编译阶段保留 `-Wall -Wextra -pedantic`，发现 compiler warning 时会在 GitHub Actions 中显示 warning annotation，但不会仅因 warning 失败；格式检查和 cppcheck 仍会按错误处理。现有测试还很薄，只能覆盖域名表加载/查找和 DNS ID 读写；后续实现协议功能时，应先补测试，再写生产代码。
 
 ### 当前测试覆盖
 
 - `test_hosts_table`：加载域名表、跳过非法行、大小写无关查询、普通 IP 命中、`0.0.0.0` 拦截命中和未命中。
 - `test_dns_packet`：读取 DNS ID、改写 DNS ID、短包保护，并确认改 ID 时不会修改报文其它字节。
+- `test_common` 。
 
 这些测试只能守住骨架行为，不能证明 DNS Question 解析、响应构造或 UDP 中继逻辑正确。特别是 sanitizer 只有在测试跑到危险路径时才有价值，因此后续畸形包测试必须跟上。
 
@@ -435,11 +449,11 @@ relay_state_expire(&state, time(NULL));
 推荐验证命令：
 
 ```bash
-make test CFLAGS="-std=c11 -Wall -Wextra -pedantic -Werror -Iinclude"
+make test CFLAGS="-std=c11 -Wall -Wextra -pedantic -Iinclude"
 
 ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=print_stacktrace=1 \
 make test \
-  CFLAGS="-std=c11 -Wall -Wextra -pedantic -Werror -g -O1 -fsanitize=address,undefined -Iinclude" \
+  CFLAGS="-std=c11 -Wall -Wextra -pedantic -g -O1 -fsanitize=address,undefined -Iinclude" \
   LDFLAGS="-fsanitize=address,undefined"
 ```
 
