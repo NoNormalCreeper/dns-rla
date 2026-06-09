@@ -12,6 +12,8 @@
 /* 类型别名避免代码过于冗长 */
 typedef unsigned char ubyte;
 
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 /*
  * 例：输入 WwW.bupt.EDU.cn 改成 www.bupt.edu.cn
  *

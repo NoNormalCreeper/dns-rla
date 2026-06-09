@@ -16,7 +16,7 @@ TARGET := dnsrelay$(EXEEXT)
 # 自动收集 src 下所有 .c 文件，新增模块后通常不用改 Makefile。
 SRC := $(wildcard src/*.c)
 OBJ := $(patsubst src/%.c,build/%.o,$(SRC))
-TEST_TARGETS := build/test_hosts_table build/test_dns_packet
+TEST_TARGETS := build/test_hosts_table build/test_dns_packet build/test_common
 
 .PHONY: all clean run test
 
@@ -38,11 +38,15 @@ run: $(TARGET)
 test: $(TEST_TARGETS)
 	./build/test_hosts_table
 	./build/test_dns_packet
+	./build/test_common
 
 build/test_hosts_table: tests/test_hosts_table.c src/hosts_table.c src/common.c | build
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 build/test_dns_packet: tests/test_dns_packet.c src/dns_packet.c src/common.c | build
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+build/test_common: tests/test_common.c src/common.c | build
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 clean:
