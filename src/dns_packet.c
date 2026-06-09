@@ -150,7 +150,7 @@ int dns_packet_parse_query(const ubyte* packet,
     query->qtype = dns_packet_read_u16(readp);
     query->qclass = dns_packet_read_u16(readp + 2);
 
-    return -1;
+    return 0;
 }
 
 int dns_packet_build_a_response(const ubyte* query,
