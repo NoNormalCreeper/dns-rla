@@ -3,7 +3,10 @@
 #include <arpa/inet.h>
 
 #include <ctype.h>
+#include <stdio.h>
 #include <string.h>
+#include <assert.h>
+
 
 /*
  * 网络字节序是大端序，但既然可以使用 arpa/inet.h，
