@@ -23,8 +23,8 @@ static int ensure_capacity(hosts_table_t* table) {
     new_capacity = table->capacity == 0 ? 128 : table->capacity * 2;
     new_entries = (hosts_entry_t*)realloc(table->entries,
                                           new_capacity * sizeof(*new_entries));
-    //realloc用于扩充表
-        if (new_entries == NULL) {
+    // realloc用于扩充表
+    if (new_entries == NULL) {
         return -1;
     }
 
