@@ -64,6 +64,7 @@ make clean
 .
 ├── Makefile
 ├── include/
+│   ├── common.h
 │   ├── config.h
 │   ├── dns_packet.h
 │   ├── hosts_table.h
@@ -71,6 +72,7 @@ make clean
 │   ├── net_loop.h
 │   └── relay_state.h
 ├── src/
+│   ├── common.c
 │   ├── config.c
 │   ├── dns_packet.c
 │   ├── hosts_table.c
@@ -102,6 +104,17 @@ make clean
 - 程序退出前释放域名表内存。
 
 它目前是程序主流程的骨架，不包含 DNS 业务逻辑。
+
+### `common`
+
+文件：
+
+- `include/common.h`
+- `src/common.c`
+
+职责：
+
+存放一些不止一个模块会用到的代码，如域名正则化。
 
 ### `config`
 

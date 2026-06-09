@@ -1,11 +1,10 @@
 #ifndef DNS_RELAY_DNS_PACKET_H
 #define DNS_RELAY_DNS_PACKET_H
 
+#include "common.h"
+
 #include <stddef.h>
 #include <stdint.h>
-
-/* 类型别名避免代码过于冗长 */
-typedef unsigned char ubyte;
 
 /* DNS Header 固定 12 字节：ID、Flags、QDCOUNT、ANCOUNT、NSCOUNT、ARCOUNT。 */
 #define DNS_HEADER_SIZE 12

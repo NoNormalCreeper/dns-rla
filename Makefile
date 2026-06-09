@@ -39,10 +39,10 @@ test: $(TEST_TARGETS)
 	./build/test_hosts_table
 	./build/test_dns_packet
 
-build/test_hosts_table: tests/test_hosts_table.c src/hosts_table.c | build
+build/test_hosts_table: tests/test_hosts_table.c src/hosts_table.c src/common.c | build
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-build/test_dns_packet: tests/test_dns_packet.c src/dns_packet.c | build
+build/test_dns_packet: tests/test_dns_packet.c src/dns_packet.c src/common.c | build
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 clean:

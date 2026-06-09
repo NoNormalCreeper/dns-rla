@@ -1,4 +1,5 @@
 #include "dns_packet.h"
+#include "common.h"
 
 #include <arpa/inet.h>
 
@@ -111,7 +112,6 @@ int dns_packet_parse_query(const ubyte* packet,
     uint16_t qdcount;
     const ubyte* readp;
     char* writep;
-    char* p;
     int is_first_part;
 
     /* id 成员 */
@@ -143,9 +143,7 @@ int dns_packet_parse_query(const ubyte* packet,
     }
 
     /* 对网址做规范化（转小写） */
-    for (p = query->qname; *p != '\0'; ++p) {
-        *p = tolower(*p);
-    }
+    normalize_domain(query->qname);
 
     /* qtype 和 qclass 成员 */
     ++readp;
