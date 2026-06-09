@@ -2,6 +2,7 @@
 #define DNS_RELAY_COMMON_H
 
 #include <limits.h>
+#include <stdbool.h>
 
 /* C 标准并未保证 CHAR_BIT 等于 8 */
 #if CHAR_BIT != 8
@@ -20,5 +21,10 @@ typedef unsigned char ubyte;
  * 其他地方也会用到这一函数。
  */
 void normalize_domain(char* domain);
+
+/*
+ * 校验一个域名是否合法。
+ */
+bool is_valid_domain(const char* domain);
 
 #endif /* DNS_RELAY_COMMON_H */
