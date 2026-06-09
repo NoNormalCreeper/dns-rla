@@ -3,6 +3,11 @@
 
 #include <limits.h>
 
+/* C 标准并未保证 CHAR_BIT 等于 8 */
+#if CHAR_BIT != 8
+#error "CHAR_BIT != 8"
+#endif
+
 /* 类型别名避免代码过于冗长 */
 typedef unsigned char ubyte;
 
