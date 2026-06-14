@@ -1,4 +1,9 @@
 #include "net_loop.h"
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "logger.h"
 
@@ -35,8 +40,48 @@ int net_loop_run(const relay_config_t* config,
     logger_info("dnsrelay skeleton is running");
     logger_info("listen port: %u", config->listen_port);
     logger_info("upstream DNS: %s", config->upstream_dns);
+    logger_info("upstream port: %u", config->upstream_port);
     logger_info("table entries available: %zu", hosts->count);
     logger_debug("network loop is not implemented yet");
+
+    // init socket
+    int local_sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (local_sock < 0) {
+        logger_error("socket() failed: %s", strerror(errno));
+        return -1;
+    }
+
+    int upstream_sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (upstream_sock < 0) {
+        logger_error("socket() failed: %s", strerror(errno));
+        close(local_sock);
+        return -1;
+    }
+
+    // bind
+    struct sockaddr_in local_addr = {.sin_family = AF_INET,
+                                     .sin_port = htons(config->listen_port)};
+    inet_aton("0.0.0.0", &local_addr.sin_addr);
+
+    if (bind(local_sock, (struct sockaddr*)&local_addr, sizeof(local_addr)) <
+        0) {
+        logger_error("bind() failed: %s", strerror(errno));
+        close(local_sock);
+        close(upstream_sock);
+        return -1;
+    }
+
+    struct sockaddr_in upstream_addr = {
+        .sin_family = AF_INET, .sin_port = htons(config->upstream_port)};
+    inet_aton(config->upstream_dns, &upstream_addr.sin_addr);
+
+    if (connect(upstream_sock, (struct sockaddr*)&upstream_addr,
+                sizeof(upstream_addr)) < 0) {
+        logger_error("connect() failed: %s", strerror(errno));
+        close(local_sock);
+        close(upstream_sock);
+        return -1;
+    }
 
     return 0;
 }
