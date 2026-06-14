@@ -8,7 +8,9 @@ EXEEXT := .exe
 endif
 
 # -std=c11：使用 C11；-Wall/-Wextra/-pedantic：尽早暴露潜在问题。
-CFLAGS ?= -std=c11 -Wall -Wextra -pedantic -Iinclude
+# 修改：用 -std=gnu17 以支持 GNU 扩展（如 inet_aton），避免一些平台上的兼容性问题。https://stackoverflow.com/a/71801111/19891658
+# 修改：添加 -Wno-missing-braces 来抑制某些编译器在初始化结构体时的警告，GCC Bug 53119，https://stackoverflow.com/questions/13746033/how-to-repair-warning-missing-braces-around-initializer#comment52433486_13758286
+CFLAGS ?= -std=gnu17 -Wall -Wextra -pedantic -Iinclude -Wno-missing-braces
 LDFLAGS ?=
 
 TARGET := dnsrelay$(EXEEXT)
