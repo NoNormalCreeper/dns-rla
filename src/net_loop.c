@@ -83,5 +83,35 @@ int net_loop_run(const relay_config_t* config,
         return -1;
     }
 
+    while (1) {
+        fd_set read_fds;
+        int max_fd = local_sock > upstream_sock ? local_sock : upstream_sock;
+        struct timeval timeout = {.tv_sec = 1,
+                                  .tv_usec = 0};  // 1 second timeout for select
+
+        FD_ZERO(&read_fds);
+        FD_SET(local_sock, &read_fds);
+        FD_SET(upstream_sock, &read_fds);
+
+        if (select(max_fd + 1, &read_fds, NULL, NULL, &timeout) < 0) {
+            logger_error("select() failed: %s", strerror(errno));
+            close(local_sock);
+            close(upstream_sock);
+            return -1;
+        }
+
+        if (FD_ISSET(local_sock, &read_fds)) {
+            logger_debug("Received a packet from a client (not processed)");
+            recvfrom(local_sock, NULL, 0, 0, NULL, NULL);  // just drain the packet
+        }
+
+        if (FD_ISSET(upstream_sock, &read_fds)) {
+            logger_debug("Received a packet from the upstream DNS (not processed)");
+            recvfrom(upstream_sock, NULL, 0, 0, NULL, NULL);  // just drain the packet
+        }
+
+        // TODO: 清理超时 pending 请求
+    }
+
     return 0;
 }
