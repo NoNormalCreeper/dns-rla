@@ -1,6 +1,7 @@
 #ifndef DNS_RELAY_CONFIG_H
 #define DNS_RELAY_CONFIG_H
 
+#include <stdint.h>
 typedef enum {
     /* 不输出调试日志，只保留错误和必要启动信息。 */
     DEBUG_NONE = 0,
@@ -19,6 +20,7 @@ typedef struct {
      * 表内未命中的请求会转发给它，例如 202.106.0.20 或 8.8.8.8。
      */
     const char* upstream_dns;
+    uint8_t upstream_port;
 
     /* 域名-IP 静态表文件路径，默认是当前目录下的 dnsrelay.txt。 */
     const char* table_file;
@@ -27,7 +29,7 @@ typedef struct {
      * 本地监听端口。DNS 标准端口是 UDP 53。
      * 开发阶段可以临时改成 5353 等高端口，避免管理员权限问题。
      */
-    unsigned short listen_port;
+    uint8_t listen_port;
 } relay_config_t;
 
 /* PPT 参考实现使用的默认外部 DNS。 */
@@ -38,6 +40,8 @@ typedef struct {
 
 /* DNS 标准服务端口。Linux/Unix 下绑定 53 端口通常需要 root 权限。 */
 #define DNS_RELAY_DEFAULT_PORT 53
+
+#define DNS_RELAY_UPSTREAM_DEFAULT_PORT 53
 
 /* 用默认值填充配置结构，必须在解析命令行前调用。 */
 void config_init_defaults(relay_config_t* config);

@@ -9,6 +9,7 @@ void config_init_defaults(relay_config_t* config) {
     config->upstream_dns = DNS_RELAY_DEFAULT_DNS;
     config->table_file = DNS_RELAY_DEFAULT_TABLE;
     config->listen_port = DNS_RELAY_DEFAULT_PORT;
+    config->upstream_port = DNS_RELAY_UPSTREAM_DEFAULT_PORT;
 }
 
 int config_parse_args(relay_config_t* config, int argc, char** argv) {
