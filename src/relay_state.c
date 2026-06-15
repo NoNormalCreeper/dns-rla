@@ -1,5 +1,7 @@
 #include "relay_state.h"
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
 void relay_state_init(relay_state_t* state) {
@@ -10,18 +12,39 @@ void relay_state_init(relay_state_t* state) {
     state->next_id = 1;
 }
 
-uint16_t relay_state_next_id(relay_state_t* state) {
-    uint16_t id = state->next_id++;
+static bool relay_state_id_in_use(const relay_state_t* state, uint16_t id) {
+    size_t i;
 
-    /*
-     * uint16_t 溢出会回到 0。
-     * 当前简单跳过 0；后续还要检查 id 是否已经在 pending 表中使用。
-     */
-    if (state->next_id == 0) {
-        state->next_id = 1;
+    for (i = 0; i < DNS_RELAY_MAX_PENDING; i++) {
+        if (state->pending[i].in_use && state->pending[i].forward_id == id) {
+            return true;
+        }
     }
 
-    return id;
+    return false;
+}
+
+int relay_state_next_id(relay_state_t* state, uint16_t* out_id) {
+    size_t attempts;
+
+    for (attempts = 0; attempts < UINT16_MAX; attempts++) {
+        uint16_t id = state->next_id++;
+
+        if (state->next_id == 0) {
+            state->next_id = 1;
+        }
+
+        if (id == 0) {
+            continue;
+        }
+
+        if (!relay_state_id_in_use(state, id)) {
+            *out_id = id;
+            return 0;
+        }
+    }
+
+    return -1;
 }
 
 int relay_state_add(relay_state_t* state,

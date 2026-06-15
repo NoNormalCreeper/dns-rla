@@ -61,12 +61,12 @@ void relay_state_init(relay_state_t* state);
 /*
  * 生成一个候选 forward_id。
  *
- * 当前只是递增生成。后续应加强为：
- *   - 跳过 0
- *   - 跳过 pending 表中仍在使用的 ID
- *   - 必要时随机起点，降低迟到响应撞新请求的概率
+ * 递增生成 + 检查冲突
+ * 返回值表示是否成功生成 ID；成功时通过 out_id 输出且返回 0。
+ * 失败时可能是表满了，调用方应记录日志或丢弃请求。
+ * 注意：ID 是 uint16_t，递增到 65535 后会回到 0；0 是我们跳过的非法 ID。
  */
-uint16_t relay_state_next_id(relay_state_t* state);
+int relay_state_next_id(relay_state_t* state, uint16_t* out_id);
 
 /* 添加一条“forward_id -> 原客户端”的映射。 */
 int relay_state_add(relay_state_t* state,
