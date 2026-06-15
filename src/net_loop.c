@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 #include "common.h"
@@ -34,9 +35,77 @@ typedef struct {
 
 static void handle_client_query_miss(net_loop_context_t* loop,
                                      client_query_t* request) {
-    (void)loop;
-    (void)request;
-    logger_debug("query miss: forwarding not implemented");
+    // 生成 forward_id，改写 DNS ID
+    uint16_t client_id = request->query.id;
+    uint16_t forward_id = relay_state_next_id(loop->relay_state);
+    // request->query.id = forward_id;
+    if (dns_packet_set_id(request->packet, request->packet_len, forward_id) !=
+        0) {
+        logger_error("Failed to set forward ID");
+        return;
+    }
+
+    // 记录 state，保存原客户端地址和 ID
+    if (relay_state_add(loop->relay_state, forward_id, client_id,
+                        (const struct sockaddr*)&request->client_addr,
+                        request->client_addr_len) != 0) {
+        logger_error("Failed to add relay state");
+        return;
+    }
+
+    // 发送上游
+    if (send(loop->upstream_sock, request->packet, request->packet_len, 0) <
+        0) {
+        logger_error("send() to upstream failed: %s", strerror(errno));
+        relay_state_remove(loop->relay_state, forward_id);
+        return;
+    }
+    logger_debug(
+        "Forwarded query with forward ID %u (client ID %u) to upstream",
+        forward_id, client_id);
+}
+
+static void handle_upstream_response(net_loop_context_t* loop) {
+    ubyte response[DNS_MAX_PACKET_SIZE];
+    ssize_t response_size =
+        recv(loop->upstream_sock, response, sizeof(response), 0);
+    if (response_size < 0) {
+        logger_error("recv() from upstream failed: %s", strerror(errno));
+        return;
+    }
+
+    uint16_t forward_id = dns_packet_get_id(response, (size_t)response_size);
+
+    // 用 forward_id 查 state 找回原客户端
+    pending_query_t* pending = relay_state_find(loop->relay_state, forward_id);
+    if (pending == NULL) {
+        // 可能是迟到响应、未知响应、已经超时清理
+        logger_warning("Received response with unknown forward ID: %u",
+                       forward_id);
+        return;
+    }
+
+    // 把响应 ID 改回 client_id，发回客户端
+    if (dns_packet_set_id(response, (size_t)response_size,
+                          pending->client_id) != 0) {
+        logger_error("Failed to set client ID in response");
+        relay_state_remove(loop->relay_state,
+                           forward_id);  // 上游响应也已经被消费了
+        return;
+    }
+
+    if (sendto(loop->local_sock, response, (size_t)response_size, 0,
+               (const struct sockaddr*)&pending->client_addr,
+               pending->client_addr_len) < 0) {
+        logger_error("sendto() to client failed: %s", strerror(errno));
+    }
+
+    // 请求完成，删除 state
+    relay_state_remove(loop->relay_state, forward_id);
+
+    logger_debug(
+        "Relayed response with forward ID %u (client ID %u) back to client",
+        forward_id, pending->client_id);
 }
 
 static void send_local_response(net_loop_context_t* loop,
@@ -67,6 +136,10 @@ static void send_local_response(net_loop_context_t* loop,
                request->client_addr_len) < 0) {
         logger_error("sendto() failed: %s", strerror(errno));
     }
+
+    logger_debug(
+        "Sent local response to client for domain %s (kind: %d)", request->query.qname,
+        lookup_result.kind);
 }
 
 static void handle_client_query(net_loop_context_t* loop) {
@@ -200,15 +273,13 @@ int net_loop_run(const relay_config_t* config,
         }
 
         if (FD_ISSET(local_sock, &read_fds)) {
-            logger_debug("Received a packet from a client (not processed)");
+            logger_debug("Received a packet from a client");
             handle_client_query(&loop);
         }
 
         if (FD_ISSET(upstream_sock, &read_fds)) {
-            logger_debug(
-                "Received a packet from the upstream DNS (not processed)");
-            recvfrom(upstream_sock, NULL, 0, 0, NULL,
-                     NULL);  // just drain the packet
+            logger_debug("Received a packet from the upstream DNS");
+            handle_upstream_response(&loop);
         }
 
         // TODO: 清理超时 pending 请求
