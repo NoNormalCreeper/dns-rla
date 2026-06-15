@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include "common.h"
 #include "dns_packet.h"
@@ -37,8 +38,11 @@ static void handle_client_query_miss(net_loop_context_t* loop,
                                      client_query_t* request) {
     // 生成 forward_id，改写 DNS ID
     uint16_t client_id = request->query.id;
-    uint16_t forward_id = relay_state_next_id(loop->relay_state);
-    // request->query.id = forward_id;
+    uint16_t forward_id;
+    if (relay_state_next_id(loop->relay_state, &forward_id) != 0) {
+        logger_error("Failed to generate forward ID");
+        return;
+    }
     if (dns_packet_set_id(request->packet, request->packet_len, forward_id) !=
         0) {
         logger_error("Failed to set forward ID");
@@ -100,12 +104,12 @@ static void handle_upstream_response(net_loop_context_t* loop) {
         logger_error("sendto() to client failed: %s", strerror(errno));
     }
 
-    // 请求完成，删除 state
-    relay_state_remove(loop->relay_state, forward_id);
-
     logger_debug(
         "Relayed response with forward ID %u (client ID %u) back to client",
         forward_id, pending->client_id);
+
+    // 请求完成，删除 state
+    relay_state_remove(loop->relay_state, forward_id);
 }
 
 static void send_local_response(net_loop_context_t* loop,
@@ -137,9 +141,8 @@ static void send_local_response(net_loop_context_t* loop,
         logger_error("sendto() failed: %s", strerror(errno));
     }
 
-    logger_debug(
-        "Sent local response to client for domain %s (kind: %d)", request->query.qname,
-        lookup_result.kind);
+    logger_debug("Sent local response to client for domain %s (kind: %d)",
+                 request->query.qname, lookup_result.kind);
 }
 
 static void handle_client_query(net_loop_context_t* loop) {
@@ -282,7 +285,7 @@ int net_loop_run(const relay_config_t* config,
             handle_upstream_response(&loop);
         }
 
-        // TODO: 清理超时 pending 请求
+        relay_state_expire(relay_state, time(NULL));
     }
 
     return 0;
