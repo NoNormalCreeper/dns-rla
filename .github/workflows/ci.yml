@@ -43,7 +43,7 @@ jobs:
           sudo apt-get install -y cppcheck
 
       - name: Run cppcheck
-        run: cppcheck --enable=warning,style,performance,portability --std=c11 --error-exitcode=1 src include tests
+        run: cppcheck --enable=warning,portability --std=c11 --error-exitcode=1 src include tests
 
   build-linux:
     name: Linux build

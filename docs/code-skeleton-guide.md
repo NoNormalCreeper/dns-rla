@@ -394,7 +394,7 @@ relay_state_expire(&state, time(NULL));
 
 ## 测试规划与 TDD 指引
 
-当前 CI 会在 push 和 pull request 时执行格式检查、静态分析、Linux 构建、普通单元测试和 sanitizer 测试。编译阶段保留 `-Wall -Wextra -pedantic`，发现 compiler warning 时会在 GitHub Actions 中显示 warning annotation，但不会仅因 warning 失败；格式检查和 cppcheck 仍会按错误处理。现有测试还很薄，只能覆盖域名表加载/查找和 DNS ID 读写；后续实现协议功能时，应先补测试，再写生产代码。
+当前 CI 会在 push 和 pull request 时执行格式检查、静态分析、Linux 构建、普通单元测试和 sanitizer 测试。编译阶段保留 `-Wall -Wextra -pedantic`，发现 compiler warning 时会在 GitHub Actions 中显示 warning annotation，但不会仅因 warning 失败；格式检查和 cppcheck 仍会按错误处理。cppcheck 只阻断 `warning` 和 `portability`，避免把 const 建议、未用成员这类风格项变成课程项目的硬门槛。现有测试还很薄，只能覆盖域名表加载/查找和 DNS ID 读写；后续实现协议功能时，应先补测试，再写生产代码。
 
 ### 当前测试覆盖
 
