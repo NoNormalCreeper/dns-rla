@@ -2,10 +2,102 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <stddef.h>
 #include <string.h>
 #include <unistd.h>
+#include "common.h"
+#include "dns_packet.h"
 
+#include "hosts_table.h"
 #include "logger.h"
+
+// 整个事件循环长期持有的资源
+typedef struct {
+    const relay_config_t* config;
+    const hosts_table_t* hosts;
+    relay_state_t* relay_state;
+
+    int local_sock;
+    int upstream_sock;
+} net_loop_context_t;
+
+// 单次的 client 请求
+typedef struct {
+    ubyte packet[DNS_MAX_PACKET_SIZE];
+    size_t packet_len;
+
+    struct sockaddr_storage client_addr;
+    socklen_t client_addr_len;
+
+    dns_query_t query;
+} client_query_t;
+
+static void handle_client_query_miss(net_loop_context_t* loop,
+                                     client_query_t* request) {
+    (void)loop;
+    (void)request;
+    logger_debug("query miss: forwarding not implemented");
+}
+
+static void send_local_response(net_loop_context_t* loop,
+                                client_query_t* request,
+                                hosts_lookup_result_t lookup_result) {
+    ubyte response[DNS_MAX_PACKET_SIZE];
+    size_t response_len = 0;
+
+    if (lookup_result.kind == HOSTS_LOOKUP_BLOCKED) {
+        if (dns_packet_build_nxdomain_response(
+                request->packet, request->packet_len, response,
+                DNS_MAX_PACKET_SIZE, &response_len) != 0) {
+            logger_error("Failed to build NXDOMAIN response");
+            return;
+        }
+    } else if (lookup_result.kind == HOSTS_LOOKUP_ADDRESS) {
+        if (dns_packet_build_a_response(request->packet, request->packet_len,
+                                        lookup_result.ipv4_network_order,
+                                        response, DNS_MAX_PACKET_SIZE,
+                                        &response_len) != 0) {
+            logger_error("Failed to build A response");
+            return;
+        }
+    };
+
+    if (sendto(loop->local_sock, response, response_len, 0,
+               (const struct sockaddr*)&request->client_addr,
+               request->client_addr_len) < 0) {
+        logger_error("sendto() failed: %s", strerror(errno));
+    }
+}
+
+static void handle_client_query(net_loop_context_t* loop) {
+    client_query_t request;
+    request.client_addr_len = sizeof(request.client_addr);
+
+    ssize_t query_size = recvfrom(
+        loop->local_sock, request.packet, sizeof(request.packet), 0,
+        (struct sockaddr*)&request.client_addr, &request.client_addr_len);
+    if (query_size < 0) {
+        logger_error("recvfrom() failed: %s", strerror(errno));
+        return;
+    }
+    request.packet_len = (size_t)query_size;
+
+    if (dns_packet_parse_query(request.packet, request.packet_len,
+                               &request.query) != 0) {
+        logger_error("Invalid DNS query");
+        return;
+    }
+
+    hosts_lookup_result_t lookup_result =
+        hosts_table_lookup(loop->hosts, request.query.qname);
+
+    if (lookup_result.kind == HOSTS_LOOKUP_MISS) {
+        handle_client_query_miss(loop, &request);
+        return;
+    }
+
+    send_local_response(loop, &request, lookup_result);
+}
 
 int net_loop_run(const relay_config_t* config,
                  const hosts_table_t* hosts,
@@ -35,7 +127,6 @@ int net_loop_run(const relay_config_t* config,
      * - recvfrom() 会同时给出发送者 IP/端口，必须保存它才能回包。
      * - UDP 没有连接状态，所有“这个响应该发给谁”的信息都靠 relay_state。
      */
-    (void)relay_state;
 
     logger_info("dnsrelay skeleton is running");
     logger_info("listen port: %u", config->listen_port);
@@ -57,6 +148,14 @@ int net_loop_run(const relay_config_t* config,
         close(local_sock);
         return -1;
     }
+
+    net_loop_context_t loop = {
+        .config = config,
+        .hosts = hosts,
+        .relay_state = relay_state,
+        .local_sock = local_sock,
+        .upstream_sock = upstream_sock,
+    };
 
     // bind
     struct sockaddr_in local_addr = {.sin_family = AF_INET,
@@ -102,12 +201,14 @@ int net_loop_run(const relay_config_t* config,
 
         if (FD_ISSET(local_sock, &read_fds)) {
             logger_debug("Received a packet from a client (not processed)");
-            recvfrom(local_sock, NULL, 0, 0, NULL, NULL);  // just drain the packet
+            handle_client_query(&loop);
         }
 
         if (FD_ISSET(upstream_sock, &read_fds)) {
-            logger_debug("Received a packet from the upstream DNS (not processed)");
-            recvfrom(upstream_sock, NULL, 0, 0, NULL, NULL);  // just drain the packet
+            logger_debug(
+                "Received a packet from the upstream DNS (not processed)");
+            recvfrom(upstream_sock, NULL, 0, 0, NULL,
+                     NULL);  // just drain the packet
         }
 
         // TODO: 清理超时 pending 请求
