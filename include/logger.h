@@ -12,6 +12,8 @@ void logger_error(const char* fmt, ...);
 /* 普通信息总是输出到 stdout，用于启动配置、表项数量等。 */
 void logger_info(const char* fmt, ...);
 
+void logger_warning(const char* fmt, ...);
+
 /* DEBUG_BASIC 及以上输出。 */
 void logger_debug(const char* fmt, ...);
 

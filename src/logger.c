@@ -36,6 +36,14 @@ void logger_info(const char* fmt, ...) {
     va_end(args);
 }
 
+void logger_warning(const char* fmt, ...) {
+    va_list args;
+
+    va_start(args, fmt);
+    logger_vprint(stdout, "warning: ", fmt, args);
+    va_end(args);
+}
+
 void logger_debug(const char* fmt, ...) {
     va_list args;
 
