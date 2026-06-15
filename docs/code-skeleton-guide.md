@@ -401,6 +401,7 @@ relay_state_expire(&state, time(NULL));
 - `test_hosts_table`：加载域名表、跳过非法行、大小写无关查询、普通 IP 命中、`0.0.0.0` 拦截命中和未命中。
 - `test_dns_packet`：读取 DNS ID、改写 DNS ID、短包保护，并确认改 ID 时不会修改报文其它字节。
 - `test_common` 。
+- `test_relay_state`：覆盖 pending ID 分配、客户端映射保存/回读、删除、超时清理和满表失败行为。
 
 这些测试只能守住骨架行为，不能证明 DNS Question 解析、响应构造或 UDP 中继逻辑正确。特别是 sanitizer 只有在测试跑到危险路径时才有价值，因此后续畸形包测试必须跟上。
 
@@ -449,11 +450,11 @@ relay_state_expire(&state, time(NULL));
 推荐验证命令：
 
 ```bash
-make test CFLAGS="-std=c11 -Wall -Wextra -pedantic -Iinclude"
+make -k test CFLAGS="-std=gnu17 -Wall -Wextra -pedantic -Iinclude"
 
 ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=print_stacktrace=1 \
-make test \
-  CFLAGS="-std=c11 -Wall -Wextra -pedantic -g -O1 -fsanitize=address,undefined -Iinclude" \
+make -k test \
+  CFLAGS="-std=gnu17 -Wall -Wextra -pedantic -g -O1 -fsanitize=address,undefined -Iinclude" \
   LDFLAGS="-fsanitize=address,undefined"
 ```
 
