@@ -1,8 +1,7 @@
 #include "common.h"
+#include "test_support.h"
 
-#include <assert.h>
 #include <stdbool.h>
-#include <string.h>
 
 int main(void) {
     const char* const test_domains[] = {
@@ -29,11 +28,12 @@ int main(void) {
                                          false, false, false, false,
                                          false, false, false, false};
 
-    assert(ARRAY_SIZE(test_domains) == ARRAY_SIZE(test_domains_results));
+    TEST_CHECK_EQ_SIZE(ARRAY_SIZE(test_domains),
+                       ARRAY_SIZE(test_domains_results));
 
     char non_normal[] = "WwW.bupt.EDU.cn";
     normalize_domain(non_normal);
-    assert(strcmp(non_normal, "www.bupt.edu.cn") == 0);
+    TEST_CHECK_EQ_STR(non_normal, "www.bupt.edu.cn");
 
     return 0;
 }

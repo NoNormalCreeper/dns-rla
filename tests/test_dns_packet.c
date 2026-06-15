@@ -1,6 +1,6 @@
 #include "dns_packet.h"
+#include "test_support.h"
 
-#include <assert.h>
 #include <string.h>
 
 int main(void) {
@@ -52,26 +52,32 @@ int main(void) {
 
     memcpy(original_tail, packet + 2, sizeof(original_tail));
 
-    assert(dns_packet_get_id(packet, sizeof(packet)) == 0x1234);
-    assert(dns_packet_set_id(packet, sizeof(packet), 0xabcd) == 0);
-    assert(packet[0] == 0xab);
-    assert(packet[1] == 0xcd);
-    assert(dns_packet_get_id(packet, sizeof(packet)) == 0xabcd);
-    assert(memcmp(packet + 2, original_tail, sizeof(original_tail)) == 0);
+    TEST_CHECK_EQ_U16(dns_packet_get_id(packet, sizeof(packet)), 0x1234);
+    TEST_CHECK_EQ_INT(dns_packet_set_id(packet, sizeof(packet), 0xabcd), 0);
+    TEST_CHECK_EQ_INT(packet[0], 0xab);
+    TEST_CHECK_EQ_INT(packet[1], 0xcd);
+    TEST_CHECK_EQ_U16(dns_packet_get_id(packet, sizeof(packet)), 0xabcd);
+    TEST_CHECK_EQ_INT(memcmp(packet + 2, original_tail, sizeof(original_tail)),
+                      0);
 
-    assert(dns_packet_get_id(too_short, sizeof(too_short)) == 0);
-    assert(dns_packet_set_id(too_short, sizeof(too_short), 0x1111) == -1);
+    TEST_CHECK_EQ_U16(dns_packet_get_id(too_short, sizeof(too_short)), 0);
+    TEST_CHECK_EQ_INT(dns_packet_set_id(too_short, sizeof(too_short), 0x1111),
+                      -1);
 
-    assert(dns_packet_parse_query(packet, sizeof(packet), &query) == 0);
-    assert(query.id == dns_packet_get_id(packet, sizeof(packet)));
-    assert(strcmp(query.qname, "www.bupt.cn") == 0);
-    assert(query.qtype == 0x3412);
-    assert(query.qclass == 0x5678);
+    TEST_CHECK_EQ_INT(dns_packet_parse_query(packet, sizeof(packet), &query),
+                      0);
+    TEST_CHECK_EQ_U16(query.id, dns_packet_get_id(packet, sizeof(packet)));
+    TEST_CHECK_EQ_STR(query.qname, "www.bupt.cn");
+    TEST_CHECK_EQ_U16(query.qtype, 0x3412);
+    TEST_CHECK_EQ_U16(query.qclass, 0x5678);
 
-    assert(dns_packet_parse_query(packet1, sizeof(packet1), &query) == -1);
-    assert(dns_packet_parse_query(header_to_long, sizeof(header_to_long),
-                                  &query) == 0);
-    assert(dns_packet_parse_query(too_short, sizeof(too_short), &query) == -1);
+    TEST_CHECK_EQ_INT(dns_packet_parse_query(packet1, sizeof(packet1), &query),
+                      -1);
+    TEST_CHECK_EQ_INT(
+        dns_packet_parse_query(header_to_long, sizeof(header_to_long), &query),
+        0);
+    TEST_CHECK_EQ_INT(
+        dns_packet_parse_query(too_short, sizeof(too_short), &query), -1);
 
     /*
      * TODO: 暂未通过的测试
