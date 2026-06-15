@@ -209,7 +209,7 @@ int net_loop_run(const relay_config_t* config,
     logger_info("upstream DNS: %s", config->upstream_dns);
     logger_info("upstream port: %u", config->upstream_port);
     logger_info("table entries available: %zu", hosts->count);
-    logger_debug("network loop is not implemented yet");
+    // logger_debug("network loop is not implemented yet");
 
     // init socket
     int local_sock = socket(AF_INET, SOCK_DGRAM, 0);
