@@ -75,7 +75,7 @@ static int dns_skip_qname(const ubyte* packet,
         ubyte label_len;
 
         if (pos >= packet_len) {
-            logger_error("[%s]: Expecting length byte or 0x00 for label",
+            logger_error("%s(): Expecting length byte or 0x00 for label",
                          __func__);
             return -1;
         }
@@ -91,7 +91,7 @@ static int dns_skip_qname(const ubyte* packet,
         }
 
         if (64 <= label_len) {
-            logger_error("[%s]: Label length too long: %u", __func__,
+            logger_error("%s(): Label length too long: %u", __func__,
                          label_len);
             return -1;
         }
@@ -101,7 +101,7 @@ static int dns_skip_qname(const ubyte* packet,
 
         /* 标签内容不能超出报文边界 */
         if (pos + label_len > packet_len) {
-            logger_error("[%s]: Label content longer than packet", __func__);
+            logger_error("%s(): Label content longer than packet", __func__);
             return -1;
         }
 
@@ -111,7 +111,7 @@ static int dns_skip_qname(const ubyte* packet,
                 if (dst < dst_end) {
                     *dst++ = '.';
                 } else {
-                    logger_error("[%s]: Output domain buffer overflow",
+                    logger_error("%s(): Output domain buffer overflow",
                                  __func__);
                     return -1;
                 }
@@ -119,7 +119,7 @@ static int dns_skip_qname(const ubyte* packet,
             first = 0;
 
             if ((size_t)(dst_end - dst) < label_len) {
-                logger_error("[%s]: Output domain buffer overflow", __func__);
+                logger_error("%s(): Output domain buffer overflow", __func__);
                 return -1;
             }
             memcpy(dst, packet + pos, label_len);
@@ -159,7 +159,7 @@ uint16_t dns_packet_get_id(const ubyte* packet, size_t packet_len) {
      * 长度不够说明这不是合法 DNS Header，骨架里返回 0 作为安全默认值。
      */
     if (packet_len < DNS_ID_INDEX + 2) {
-        logger_warning("[%s]: Packet too short (length = %zu) to get id",
+        logger_warning("%s(): Packet too short (length = %zu) to get id",
                        __func__, packet_len);
         return 0;
     }
@@ -171,7 +171,7 @@ uint16_t dns_packet_get_id(const ubyte* packet, size_t packet_len) {
 int dns_packet_set_id(ubyte* packet, size_t packet_len, uint16_t id) {
     /* 改写 ID 前也必须检查长度，避免收到短包时越界写。 */
     if (packet_len < DNS_ID_INDEX + 2) {
-        logger_warning("[%s]: Packet too short (length = %zu) to set id",
+        logger_warning("%s(): Packet too short (length = %zu) to set id",
                        __func__, packet_len);
         return -1;
     }
@@ -189,7 +189,7 @@ int dns_packet_parse_query(const ubyte* packet,
 
     /* Header */
     if (packet_len < DNS_HEADER_SIZE) {
-        logger_error("[%s]: Packet length shorter than a header (length = %zu)",
+        logger_error("%s(): Packet length shorter than a header (length = %zu)",
                      __func__, packet_len);
         return -1;
     }
@@ -198,7 +198,7 @@ int dns_packet_parse_query(const ubyte* packet,
     /* QDCOUNT */
     qdcount = dns_packet_read_u16(packet + DNS_QDCOUNT_INDEX);
     if (qdcount != 1) {
-        logger_error("[%s]: Question count not 1 (qdcount = %hu)", __func__,
+        logger_error("%s(): Question count not 1 (qdcount = %hu)", __func__,
                      qdcount);
         return -1;
     }
@@ -206,19 +206,19 @@ int dns_packet_parse_query(const ubyte* packet,
     /* QNAME */
     if (dns_skip_qname(packet, packet_len, DNS_HEADER_SIZE, query->qname,
                        sizeof query->qname, &qtype_pos) != 0) {
-        logger_error("[%s]: Invalid qname", __func__);
+        logger_error("%s(): Invalid qname", __func__);
         return -1;
     }
 
     /* 域名规范化 */
     normalize_domain(query->qname);
 
-    logger_debug("[%s]: Normalized qname: %s", __func__, query->qname);
+    logger_debug("%s(): Normalized qname: %s", __func__, query->qname);
 
     /* QTYPE, QCLASS */
     if (qtype_pos + 4 > packet_len) {
         logger_error(
-            "[%s]: Packet too short (length = %zu) to get qtype and qclass",
+            "%s(): Packet too short (length = %zu) to get qtype and qclass",
             __func__, packet_len);
         return -1;
     }
@@ -260,14 +260,14 @@ int dns_packet_build_a_response(const ubyte* query,
     /* 直接定位到 Question 结束，顺带检查 Question 合法性 */
     if (dns_skip_qname(query, query_len, DNS_HEADER_SIZE, NULL, 0,
                        &qtype_pos) != 0) {
-        logger_error("[%s]: Invalid query qname", __func__);
+        logger_error("%s(): Invalid query qname", __func__);
         return -1;
     }
     question_end = qtype_pos + 4; /* QTYPE(2) + QCLASS(2) */
 
     if (question_end > query_len) {
         logger_error(
-            "[%s]: Query too short for QTYPE/QCLASS "
+            "%s(): Query too short for QTYPE/QCLASS "
             "(need %zu, have %zu)",
             __func__, question_end, query_len);
         return -1;
@@ -275,7 +275,7 @@ int dns_packet_build_a_response(const ubyte* query,
 
     if (response_capacity < question_end + answer_a_size) {
         logger_error(
-            "[%s]: Response buffer too small "
+            "%s(): Response buffer too small "
             "(need %zu, capacity %zu)",
             __func__, question_end + answer_a_size, response_capacity);
         return -1;
@@ -326,7 +326,7 @@ int dns_packet_build_a_response(const ubyte* query,
 
     *response_len = (size_t)(wp - response);
 
-    logger_debug("[%s]: Built A response (%zu bytes), id=%u", __func__,
+    logger_debug("%s(): Built A response (%zu bytes), id=%u", __func__,
                  *response_len, dns_packet_get_id(response, *response_len));
 
     return 0;
@@ -355,14 +355,14 @@ int dns_packet_build_nxdomain_response(const ubyte* query,
     /* 依旧直接定位到 Question 结束，顺带检查 Question 合法性 */
     if (dns_skip_qname(query, query_len, DNS_HEADER_SIZE, NULL, 0,
                        &qtype_pos) != 0) {
-        logger_error("[%s]: Invalid query qname", __func__);
+        logger_error("%s(): Invalid query qname", __func__);
         return -1;
     }
     question_end = qtype_pos + 4; /* QTYPE(2) + QCLASS(2) */
 
     if (question_end > query_len) {
         logger_error(
-            "[%s]: Query too short for QTYPE/QCLASS "
+            "%s(): Query too short for QTYPE/QCLASS "
             "(need %zu, have %zu)",
             __func__, question_end, query_len);
         return -1;
@@ -370,7 +370,7 @@ int dns_packet_build_nxdomain_response(const ubyte* query,
 
     if (response_capacity < question_end) {
         logger_error(
-            "[%s]: Response buffer too small "
+            "%s(): Response buffer too small "
             "(need %zu, capacity %zu)",
             __func__, question_end, response_capacity);
         return -1;
@@ -396,7 +396,7 @@ int dns_packet_build_nxdomain_response(const ubyte* query,
 
     *response_len = question_end;
 
-    logger_debug("[%s]: Built NXDOMAIN response (%zu bytes), id=%u", __func__,
+    logger_debug("%s(): Built NXDOMAIN response (%zu bytes), id=%u", __func__,
                  *response_len, dns_packet_get_id(response, *response_len));
 
     return 0;
