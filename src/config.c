@@ -7,16 +7,15 @@
 uint16_t local_port = 5353;      // 默认本地监听端口
 uint16_t upstream_port = 53;    //默认上游端口参数
 
-uint16_t parse_port(const char *str) {
+int parse_port(const char *str, uint16_t *port) {
     char *endptr;
-    //strtol将字符串转为数字
     long val = strtol(str, &endptr, 10);
-    //endptr指向字符串末尾，同时端口号无误
-    if ( *endptr != '\0' || val < 1 || val > 65535) {
+    if (*endptr != '\0' || val < 1 || val > 65535) {
         fprintf(stderr, "Invalid port: %s\n", str);
-        exit(-1);
+        return -1;
     }
-    return (uint16_t)val;
+    *port = (uint16_t)val;
+    return 0;
 }
 
 void config_init_defaults(relay_config_t* config) {
@@ -49,17 +48,29 @@ int config_parse_args(relay_config_t* config, int argc, char** argv) {
         config->debug_level = DEBUG_VERBOSE;
     }else if(strcmp(argv[argi], "-p") == 0){
         if(argi+1<argc){
-        config->listen_port = parse_port(argv[++argi]);
+
+        if(parse_port(argv[++argi], &config->listen_port) != 0){
+            return -1;
+        }
+
         local_port=config->listen_port;
+        
         }else{
-            config->listen_port = local_port;
+            fprintf(stderr,"missing parameter for -p\n");
+            return -1;
         }
     }else if(strcmp(argv[argi], "--upstream-port") == 0){
         if(argi+1<argc){
-        config->upstream_port = parse_port(argv[++argi]);
-                upstream_port =config->upstream_port;
+
+        if(parse_port(argv[++argi], &config->upstream_port) != 0){
+            return -1;
+        }
+
+        upstream_port =config->upstream_port;
+
         }else{
-            //使用默认端口号
+            fprintf(stderr,"missing parameter for --upstream-port\n");
+            return -1;
         }}
         else{
             break;
