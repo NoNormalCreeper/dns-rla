@@ -78,22 +78,18 @@ int main(void) {
         0);
     TEST_CHECK_EQ_INT(
         dns_packet_parse_query(too_short, sizeof(too_short), &query), -1);
-
-    /*
-     * TODO: 暂未通过的测试
-     *
-     * assert(dns_packet_parse_query(qname_no_end, sizeof(qname_no_end),
-     * &query)==-1); assert(dns_packet_parse_query(no_qlcass_or_qtype,
-     * sizeof(no_qlcass_or_qtype), &query)==-1);
-     * assert(dns_packet_parse_query(compressed_ptr, sizeof(compressed_ptr),
-     * &query) == -1); assert(dns_packet_parse_query(label_to_long,
-     * sizeof(label_to_long), &query) == -1);
-     */
-
-    (void)qname_no_end;
-    (void)no_qlcass_or_qtype;
-    (void)compressed_ptr;
-    (void)label_to_long;
+    TEST_CHECK_EQ_INT(
+        dns_packet_parse_query(qname_no_end, sizeof(qname_no_end), &query), -1);
+    TEST_CHECK_EQ_INT(
+        dns_packet_parse_query(no_qlcass_or_qtype, sizeof(no_qlcass_or_qtype),
+                               &query),
+        -1);
+    TEST_CHECK_EQ_INT(
+        dns_packet_parse_query(compressed_ptr, sizeof(compressed_ptr), &query),
+        -1);
+    TEST_CHECK_EQ_INT(
+        dns_packet_parse_query(label_to_long, sizeof(label_to_long), &query),
+        -1);
 
     /* TODO: 暂未编写的测试 */
     (void)build_test;
