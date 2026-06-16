@@ -15,9 +15,9 @@ static void logger_vprint(FILE* stream,
     struct tm* timeinfo;
     char buffer[80];
     time(&rawtime);
-    timeinfo = localtime(&rawtime);  //转换成电脑时区时间
+    timeinfo = localtime(&rawtime);  // 转换成电脑时区时间
     strftime(buffer, sizeof(buffer), "[%Y-%m-%d %H:%M:%S]",
-             timeinfo);  //格式化字符串
+             timeinfo);  // 格式化字符串
     fprintf(stream, "%s ", buffer);
 
     fprintf(stream, "%s", prefix);
@@ -30,7 +30,7 @@ void logger_init(debug_level_t level) {
     /* 简单全局等级，课程设计单线程事件循环下够用。 */
     if (level >= DEBUG_NONE && level <= DEBUG_VERBOSE) {
         current_level = level;
-    } else {  //如果等级不在范围内则打印警告然后不输出日志
+    } else {  // 如果等级不在范围内则打印警告然后不输出日志
         fprintf(stderr,
                 "logger_init: invalid level %d, fallback to DEBUG_NONE\n",
                 level);
