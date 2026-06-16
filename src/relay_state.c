@@ -52,6 +52,10 @@ int relay_state_add(relay_state_t* state,
                     uint16_t client_id,
                     const struct sockaddr* client_addr,
                     socklen_t client_addr_len) {
+    if (client_addr_len > sizeof(((pending_query_t*)0)->client_addr)) {
+        return -1;
+    }
+
     size_t i;
 
     /*
