@@ -41,6 +41,88 @@ __attribute__((unused)) static void dns_packet_write_u32(ubyte* start,
     memcpy(start, &buf, sizeof buf);
 }
 
+/*
+ * 从 packet[start_offset] 开始安全遍历 DNS QNAME 标签，直到遇到 0x00 终止符。
+ *
+ * 同时执行：
+ *   - 报文边界检查（每一步都确保读指针不越 packet 边界）
+ *   - 标签长度合法性检查（≤ 63，拒绝压缩指针 0xC0xx 和保留值）
+ *   - 终止符检查（必须有 0x00，不会无限循环）
+ *
+ * 若 qname_buf 非 NULL：
+ *   将标签解码为点分字符串写入 qname_buf，例如 "www.bupt.cn"。
+ *   注意：不在此函数内做大小写转换或域名合法性校验——这些由调用方负责。
+ *
+ * 若 qname_buf 为 NULL：
+ *   只做验证和定位，不输出字符串。
+ *
+ * 成功时：*end_offset 指向 0x00 终止符之后第一个字节（即 QTYPE 起始位置），返回
+ * 0。 失败时：返回 -1。
+ */
+static int dns_skip_qname(const ubyte* packet,
+                          size_t packet_len,
+                          size_t start_offset,
+                          char* qname_buf,
+                          size_t qname_buf_size,
+                          size_t* end_offset) {
+    size_t pos = start_offset;
+    char* dst = qname_buf;
+    const char* const dst_end =
+        qname_buf ? qname_buf + qname_buf_size - 1 : NULL;
+    int first = 1;
+
+    while (1) {
+        ubyte label_len;
+
+        if (pos >= packet_len) {
+            /* 没有长度字节或 0x00 */
+            return -1;
+        }
+
+        label_len = packet[pos];
+
+        if (label_len == 0x00) {
+            if (dst) {
+                *dst = '\0';
+            }
+            *end_offset = pos + 1;
+            return 0;
+        }
+
+        if (64 <= label_len) {
+            return -1;
+        }
+
+        /* 跳过长度字节 */
+        pos += 1;
+
+        /* 标签内容不能超出报文边界 */
+        if (pos + label_len > packet_len) {
+            return -1;
+        }
+
+        /* 写出点分形式 */
+        if (dst) {
+            if (!(first)) {
+                if (dst < dst_end) {
+                    *dst++ = '.';
+                } else {
+                    return -1; /* 缓冲区溢出 */
+                }
+            }
+            first = 0;
+
+            if ((size_t)(dst_end - dst) < label_len) {
+                return -1; /* 缓冲区溢出 */
+            }
+            memcpy(dst, packet + pos, label_len);
+            dst += label_len;
+        }
+
+        pos += label_len;
+    }
+}
+
 /* 例如 count = 5 时返回的数值是 0b0000'0000'0001'1111 */
 static uint16_t dns_packet_ones_16(size_t count) {
     return ~((uint16_t)(~0) << count);
@@ -91,64 +173,36 @@ int dns_packet_set_id(ubyte* packet, size_t packet_len, uint16_t id) {
 int dns_packet_parse_query(const ubyte* packet,
                            size_t packet_len,
                            dns_query_t* query) {
-    /*
-     * 后续实现步骤：
-     * 1. 检查 packet_len >= DNS_HEADER_SIZE。
-     * 2. 读取 QDCOUNT。DNS Header 中 QDCOUNT 位于偏移 4、5。
-     * 3. 从偏移 12 开始解析 QNAME。
-     * 4. QNAME 每段是“长度字节 + 标签内容”，以 0 结尾。
-     * 5. QNAME 后面紧跟 2 字节 QTYPE 和 2 字节 QCLASS。
-     *
-     * 协议细节：
-     * - 查询报文的 Question 里的 QNAME 通常不使用压缩指针。
-     * - 响应报文里的 NAME 经常使用 0xC00C 压缩指针。
-     * - 为了安全，解析时遇到长度越界、域名超过 255 字节、缺少结尾 0
-     * 都应返回错误。
-     */
-
-    /* TODO: 错误检查 */
-
-    /* TODO: 暂未考虑压缩指针 */
     uint16_t qdcount;
-    const ubyte* readp;
-    char* writep;
-    int is_first_part;
+    size_t qtype_pos;
 
-    /* id 成员 */
+    /* DNS packet 一定要有 Header */
+    if (packet_len < DNS_HEADER_SIZE) {
+        return -1;
+    }
     query->id = dns_packet_get_id(packet, packet_len);
 
-    /* qname 成员 */
-    memset(query->qname, 0, sizeof query->qname);
+    /* 只接受恰好 1 个 Question */
     qdcount = dns_packet_read_u16(packet + DNS_QDCOUNT_INDEX);
-
-    if (!(qdcount >= 1)) {
+    if (qdcount != 1) {
         return -1;
     }
 
-    readp = packet + DNS_HEADER_SIZE;
-    writep = query->qname;
-    is_first_part = 1;
-
-    while (*readp != (ubyte)0x00) {
-        size_t len;
-        len = *readp++;
-        if (is_first_part) {
-            is_first_part = 0;
-        } else {
-            *writep++ = '.';
-        }
-        memcpy(writep, readp, len);
-        readp += len;
-        writep += len;
+    /* QNAME 检查和解码 */
+    if (dns_skip_qname(packet, packet_len, DNS_HEADER_SIZE, query->qname,
+                       sizeof query->qname, &qtype_pos) != 0) {
+        return -1;
     }
 
-    /* 对网址做规范化（转小写） */
+    /* 域名规范化 */
     normalize_domain(query->qname);
 
-    /* qtype 和 qclass 成员 */
-    ++readp;
-    query->qtype = dns_packet_read_u16(readp);
-    query->qclass = dns_packet_read_u16(readp + 2);
+    /* 获取 QTYPE + QCLASS */
+    if (qtype_pos + 4 > packet_len) {
+        return -1;
+    }
+    query->qtype = dns_packet_read_u16(packet + qtype_pos);
+    query->qclass = dns_packet_read_u16(packet + qtype_pos + 2);
 
     return 0;
 }
