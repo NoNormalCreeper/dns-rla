@@ -257,13 +257,12 @@ int dns_packet_build_a_response(const ubyte* query,
     uint16_t flags;
     ubyte* wp;
 
-    /* 1. 验证查询报文合法性，同时定位 Question 段结束位置。 */
+    /* 直接定位到 Question 结束，顺带检查 Question 合法性 */
     if (dns_skip_qname(query, query_len, DNS_HEADER_SIZE, NULL, 0,
                        &qtype_pos) != 0) {
         logger_error("[%s]: Invalid query qname", __func__);
         return -1;
     }
-
     question_end = qtype_pos + 4; /* QTYPE(2) + QCLASS(2) */
 
     if (question_end > query_len) {
@@ -274,7 +273,6 @@ int dns_packet_build_a_response(const ubyte* query,
         return -1;
     }
 
-    /* 2. 检查响应缓冲区容量。 */
     if (response_capacity < question_end + answer_a_size) {
         logger_error(
             "[%s]: Response buffer too small "
@@ -283,11 +281,11 @@ int dns_packet_build_a_response(const ubyte* query,
         return -1;
     }
 
-    /* 3. 复制原查询的 Header + Question。 */
+    /* 复制 Header 和 Question 部分 */
     memcpy(response, query, question_end);
     wp = response + question_end;
 
-    /* 4. 修改 Header：QR=1(响应), RA=1(递归可用), RCODE=0(无错误)。 */
+    /* 修改 Header */
     flags = dns_packet_read_u16(response + DNS_FLAGS_INDEX);
     flags = dns_packet_flags_modify(flags, DNS_FLAGS_QR_BIT_INDEX,
                                     DNS_FLAGS_QR_BIT_SIZE, 1);
@@ -302,29 +300,27 @@ int dns_packet_build_a_response(const ubyte* query,
     dns_packet_write_u16(response + DNS_NSCOUNT_INDEX, 0);
     dns_packet_write_u16(response + DNS_ARCOUNT_INDEX, 0);
 
-    /* 5. 追加 Answer RR。 */
-
-    /* NAME: 压缩指针 0xC00C，指向报文偏移 12 处的原 QNAME */
+    /*
+     * == 添加 Answer ==
+     * NAME = 压缩指针;
+     * TYPE = A;
+     * CLASS = IN;
+     * TTL = 300 秒;
+     * RDLENGTH = 4;
+     * RDATA = 参数里那个地址
+     */
     dns_packet_write_u16(wp, 0xC00C);
     wp += 2;
-
-    /* TYPE: A */
     dns_packet_write_u16(wp, DNS_TYPE_A);
     wp += 2;
-
-    /* CLASS: IN */
     dns_packet_write_u16(wp, DNS_CLASS_IN);
     wp += 2;
-
-    /* TTL: 300 秒 */
     dns_packet_write_u32(wp, 300);
     wp += 4;
-
-    /* RDLENGTH: 4 */
     dns_packet_write_u16(wp, 4);
     wp += 2;
-
-    /* RDATA: IPv4 地址（已为网络字节序，不应再调用 htonl） */
+    /* 参数传入的已经是网络字节序了。所以直接 memcpy 不用中间的
+     * dns_packet_write_u16 */
     memcpy(wp, &ipv4_network_order, 4);
     wp += 4;
 
@@ -356,13 +352,12 @@ int dns_packet_build_nxdomain_response(const ubyte* query,
     size_t question_end;
     uint16_t flags;
 
-    /* 1. 验证查询报文合法性，同时定位 Question 段结束位置。 */
+    /* 依旧直接定位到 Question 结束，顺带检查 Question 合法性 */
     if (dns_skip_qname(query, query_len, DNS_HEADER_SIZE, NULL, 0,
                        &qtype_pos) != 0) {
         logger_error("[%s]: Invalid query qname", __func__);
         return -1;
     }
-
     question_end = qtype_pos + 4; /* QTYPE(2) + QCLASS(2) */
 
     if (question_end > query_len) {
@@ -373,7 +368,6 @@ int dns_packet_build_nxdomain_response(const ubyte* query,
         return -1;
     }
 
-    /* 2. 检查响应缓冲区容量（只需容纳 Header + Question，无 Answer）。 */
     if (response_capacity < question_end) {
         logger_error(
             "[%s]: Response buffer too small "
@@ -382,11 +376,10 @@ int dns_packet_build_nxdomain_response(const ubyte* query,
         return -1;
     }
 
-    /* 3. 复制原查询的 Header + Question。 */
+    /* 依旧复制 Header 和 Question 部分 */
     memcpy(response, query, question_end);
 
-    /* 4. 修改 Header：QR=1(响应), RA=1(递归可用), RCODE=NXDOMAIN(3),
-     *                  ANCOUNT=0, NSCOUNT=0, ARCOUNT=0 */
+    /* 依旧修改 Header */
     flags = dns_packet_read_u16(response + DNS_FLAGS_INDEX);
     flags = dns_packet_flags_modify(flags, DNS_FLAGS_QR_BIT_INDEX,
                                     DNS_FLAGS_QR_BIT_SIZE, 1);
