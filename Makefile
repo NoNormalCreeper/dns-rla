@@ -59,8 +59,8 @@ build/test_hosts_table: tests/test_hosts_table.c tests/test_support.h \
 	$(CC) $(CFLAGS) tests/test_hosts_table.c src/hosts_table.c src/common.c -o $@ $(LDFLAGS)
 
 build/test_dns_packet: tests/test_dns_packet.c tests/test_support.h \
-	src/dns_packet.c src/common.c | build
-	$(CC) $(CFLAGS) tests/test_dns_packet.c src/dns_packet.c src/common.c -o $@ $(LDFLAGS)
+	src/dns_packet.c src/common.c src/logger.c | build
+	$(CC) $(CFLAGS) tests/test_dns_packet.c src/dns_packet.c src/common.c src/logger.c -o $@ $(LDFLAGS)
 
 build/test_common: tests/test_common.c tests/test_support.h src/common.c | build
 	$(CC) $(CFLAGS) tests/test_common.c src/common.c -o $@ $(LDFLAGS)
