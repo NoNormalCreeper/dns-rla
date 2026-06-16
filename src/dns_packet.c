@@ -352,10 +352,59 @@ int dns_packet_build_nxdomain_response(const ubyte* query,
      * - PPT 要求 0.0.0.0 表项表示“域名不存在”，不是返回 0.0.0.0。
      * - 返回 NXDOMAIN 后，客户端通常会把它当成解析失败。
      */
-    (void)query;
-    (void)query_len;
-    (void)response;
-    (void)response_capacity;
-    (void)response_len;
-    return -1;
+    size_t qtype_pos;
+    size_t question_end;
+    uint16_t flags;
+
+    /* 1. 验证查询报文合法性，同时定位 Question 段结束位置。 */
+    if (dns_skip_qname(query, query_len, DNS_HEADER_SIZE, NULL, 0,
+                       &qtype_pos) != 0) {
+        logger_error("[%s]: Invalid query qname", __func__);
+        return -1;
+    }
+
+    question_end = qtype_pos + 4; /* QTYPE(2) + QCLASS(2) */
+
+    if (question_end > query_len) {
+        logger_error(
+            "[%s]: Query too short for QTYPE/QCLASS "
+            "(need %zu, have %zu)",
+            __func__, question_end, query_len);
+        return -1;
+    }
+
+    /* 2. 检查响应缓冲区容量（只需容纳 Header + Question，无 Answer）。 */
+    if (response_capacity < question_end) {
+        logger_error(
+            "[%s]: Response buffer too small "
+            "(need %zu, capacity %zu)",
+            __func__, question_end, response_capacity);
+        return -1;
+    }
+
+    /* 3. 复制原查询的 Header + Question。 */
+    memcpy(response, query, question_end);
+
+    /* 4. 修改 Header：QR=1(响应), RA=1(递归可用), RCODE=NXDOMAIN(3),
+     *                  ANCOUNT=0, NSCOUNT=0, ARCOUNT=0 */
+    flags = dns_packet_read_u16(response + DNS_FLAGS_INDEX);
+    flags = dns_packet_flags_modify(flags, DNS_FLAGS_QR_BIT_INDEX,
+                                    DNS_FLAGS_QR_BIT_SIZE, 1);
+    flags = dns_packet_flags_modify(flags, DNS_FLAGS_RA_BIT_INDEX,
+                                    DNS_FLAGS_RA_BIT_SIZE, 1);
+    flags =
+        dns_packet_flags_modify(flags, DNS_FLAGS_RCODE_BIT_INDEX,
+                                DNS_FLAGS_RCODE_BIT_SIZE, DNS_RCODE_NXDOMAIN);
+    dns_packet_write_u16(response + DNS_FLAGS_INDEX, flags);
+    dns_packet_write_u16(response + DNS_QDCOUNT_INDEX, 1);
+    dns_packet_write_u16(response + DNS_ANCOUNT_INDEX, 0);
+    dns_packet_write_u16(response + DNS_NSCOUNT_INDEX, 0);
+    dns_packet_write_u16(response + DNS_ARCOUNT_INDEX, 0);
+
+    *response_len = question_end;
+
+    logger_debug("[%s]: Built NXDOMAIN response (%zu bytes), id=%u", __func__,
+                 *response_len, dns_packet_get_id(response, *response_len));
+
+    return 0;
 }
