@@ -35,8 +35,7 @@ static void dns_packet_write_u16(ubyte* start, uint16_t val) {
     memcpy(start, &buf, sizeof buf);
 }
 
-__attribute__((unused)) static void dns_packet_write_u32(ubyte* start,
-                                                         uint32_t val) {
+static void dns_packet_write_u32(ubyte* start, uint32_t val) {
     uint32_t buf;
     buf = htonl(val);
     memcpy(start, &buf, sizeof buf);
@@ -236,51 +235,105 @@ int dns_packet_build_a_response(const ubyte* query,
                                 size_t response_capacity,
                                 size_t* response_len) {
     /*
-     * 后续实现步骤：
-     * 1. 复制原查询的 Header + Question 到 response。
-     * 2. 设置 Flags：QR=1 表示响应，RA=1 表示递归可用，RCODE=0。
-     * 3. 设置 QDCOUNT=1，ANCOUNT=1，NSCOUNT=0，ARCOUNT=0。
-     * 4. 追加一条 Answer：
-     *    - NAME 使用压缩指针 0xC00C，指向原 Question 的 QNAME。
-     *    - TYPE=A，CLASS=IN。
-     *    - TTL 可先写 60 或 300 秒。
-     *    - RDLENGTH=4。
-     *    - RDATA 写 ipv4_network_order 的 4 字节。
+     * 构造本地 A 记录响应。
      *
-     * trick：
-     * - 不要把 ipv4_network_order 再 htonl() 一次；inet_pton()
-     * 已经给网络字节序。
-     * - response_capacity 必须在每次写入前检查，避免构造超长响应。
+     * 响应结构：Header(12) + Question(变长) + AnswerRR(16)
+     *
+     * Answer RR 各字段：
+     *   NAME     2B  压缩指针 0xC00C，指向偏移 12 处的原 QNAME
+     *   TYPE     2B  DNS_TYPE_A (1)
+     *   CLASS    2B  DNS_CLASS_IN (1)
+     *   TTL      4B  300 秒
+     *   RDLENGTH 2B  4
+     *   RDATA    4B  IPv4 地址（网络字节序）
      */
 
-    /* TODO: 未考虑错误检查 */
+    /* Answer RR 固定大小：NAME(2) + TYPE(2) + CLASS(2) + TTL(4) + RDLENGTH(2) +
+     * RDATA(4) */
+    const size_t answer_a_size = 16;
 
+    size_t qtype_pos;
+    size_t question_end;
     uint16_t flags;
+    ubyte* wp;
 
-    (void)query;
-    (void)query_len;
-    (void)ipv4_network_order;
-    (void)response;
-    (void)response_capacity;
-    (void)response_len;
+    /* 1. 验证查询报文合法性，同时定位 Question 段结束位置。 */
+    if (dns_skip_qname(query, query_len, DNS_HEADER_SIZE, NULL, 0,
+                       &qtype_pos) != 0) {
+        logger_error("[%s]: Invalid query qname", __func__);
+        return -1;
+    }
 
-    memcpy(response, query, DNS_HEADER_SIZE);
-    flags = dns_packet_read_u16(query + DNS_FLAGS_INDEX);
+    question_end = qtype_pos + 4; /* QTYPE(2) + QCLASS(2) */
+
+    if (question_end > query_len) {
+        logger_error(
+            "[%s]: Query too short for QTYPE/QCLASS "
+            "(need %zu, have %zu)",
+            __func__, question_end, query_len);
+        return -1;
+    }
+
+    /* 2. 检查响应缓冲区容量。 */
+    if (response_capacity < question_end + answer_a_size) {
+        logger_error(
+            "[%s]: Response buffer too small "
+            "(need %zu, capacity %zu)",
+            __func__, question_end + answer_a_size, response_capacity);
+        return -1;
+    }
+
+    /* 3. 复制原查询的 Header + Question。 */
+    memcpy(response, query, question_end);
+    wp = response + question_end;
+
+    /* 4. 修改 Header：QR=1(响应), RA=1(递归可用), RCODE=0(无错误)。 */
+    flags = dns_packet_read_u16(response + DNS_FLAGS_INDEX);
     flags = dns_packet_flags_modify(flags, DNS_FLAGS_QR_BIT_INDEX,
                                     DNS_FLAGS_QR_BIT_SIZE, 1);
     flags = dns_packet_flags_modify(flags, DNS_FLAGS_RA_BIT_INDEX,
                                     DNS_FLAGS_RA_BIT_SIZE, 1);
-    flags = dns_packet_flags_modify(flags, DNS_FLAGS_RCODE_BIT_INDEX,
-                                    DNS_FLAGS_RCODE_BIT_SIZE, 0);
+    flags =
+        dns_packet_flags_modify(flags, DNS_FLAGS_RCODE_BIT_INDEX,
+                                DNS_FLAGS_RCODE_BIT_SIZE, DNS_RCODE_NOERROR);
     dns_packet_write_u16(response + DNS_FLAGS_INDEX, flags);
     dns_packet_write_u16(response + DNS_QDCOUNT_INDEX, 1);
     dns_packet_write_u16(response + DNS_ANCOUNT_INDEX, 1);
     dns_packet_write_u16(response + DNS_NSCOUNT_INDEX, 0);
     dns_packet_write_u16(response + DNS_ARCOUNT_INDEX, 0);
 
-    /* TODO */
+    /* 5. 追加 Answer RR。 */
 
-    return -1;
+    /* NAME: 压缩指针 0xC00C，指向报文偏移 12 处的原 QNAME */
+    dns_packet_write_u16(wp, 0xC00C);
+    wp += 2;
+
+    /* TYPE: A */
+    dns_packet_write_u16(wp, DNS_TYPE_A);
+    wp += 2;
+
+    /* CLASS: IN */
+    dns_packet_write_u16(wp, DNS_CLASS_IN);
+    wp += 2;
+
+    /* TTL: 300 秒 */
+    dns_packet_write_u32(wp, 300);
+    wp += 4;
+
+    /* RDLENGTH: 4 */
+    dns_packet_write_u16(wp, 4);
+    wp += 2;
+
+    /* RDATA: IPv4 地址（已为网络字节序，不应再调用 htonl） */
+    memcpy(wp, &ipv4_network_order, 4);
+    wp += 4;
+
+    *response_len = (size_t)(wp - response);
+
+    logger_debug("[%s]: Built A response (%zu bytes), id=%u", __func__,
+                 *response_len, dns_packet_get_id(response, *response_len));
+
+    return 0;
 }
 
 int dns_packet_build_nxdomain_response(const ubyte* query,
