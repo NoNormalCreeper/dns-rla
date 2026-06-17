@@ -3,6 +3,52 @@
 
 #include <string.h>
 
+static uint16_t read_u16_be(const ubyte* p) {
+    return (uint16_t)(((uint16_t)p[0] << 8) | p[1]);
+}
+
+static void test_build_a_response_flags(void) {
+    ubyte query[] = {0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+                     0x00, 0x00, 3,    'w',  'w',  'w',  4,    'b',  'u',  'p',
+                     't',  2,    'c',  'n',  0,    0x00, 0x01, 0x00, 0x01};
+    ubyte response[DNS_MAX_PACKET_SIZE];
+    size_t response_len = 0;
+    uint32_t ip = 0x0a86807b;
+    uint16_t flags;
+
+    TEST_CHECK_EQ_INT(
+        dns_packet_build_a_response(query, sizeof(query), ip, response,
+                                    sizeof(response), &response_len),
+        0);
+
+    flags = read_u16_be(response + DNS_FLAGS_INDEX);
+    TEST_CHECK(flags & 0x8000);
+    TEST_CHECK(flags & 0x0080);
+    TEST_CHECK_EQ_U16((uint16_t)(flags & 0x000f), 0);
+    TEST_CHECK_EQ_U16(read_u16_be(response + DNS_QDCOUNT_INDEX), 1);
+    TEST_CHECK_EQ_U16(read_u16_be(response + DNS_ANCOUNT_INDEX), 1);
+}
+
+static void test_build_nxdomain_response_flags(void) {
+    ubyte query[] = {0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
+                     0x00, 0x00, 0x00, 0x00, 3,    '0',  '0',  '8',
+                     2,    'c',  'n',  0,    0x00, 0x01, 0x00, 0x01};
+    ubyte response[DNS_MAX_PACKET_SIZE];
+    size_t response_len = 0;
+    uint16_t flags;
+
+    TEST_CHECK_EQ_INT(
+        dns_packet_build_nxdomain_response(query, sizeof(query), response,
+                                           sizeof(response), &response_len),
+        0);
+
+    flags = read_u16_be(response + DNS_FLAGS_INDEX);
+    TEST_CHECK(flags & 0x8000);
+    TEST_CHECK(flags & 0x0080);
+    TEST_CHECK_EQ_U16((uint16_t)(flags & 0x000f), DNS_RCODE_NXDOMAIN);
+    TEST_CHECK_EQ_U16(read_u16_be(response + DNS_ANCOUNT_INDEX), 0);
+}
+
 int main(void) {
     ubyte packet[] = {0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
                       0x00, 0x00, 0x00, 0x00, 3,    'W',  'w',  'W',
@@ -93,6 +139,9 @@ int main(void) {
 
     /* TODO: 暂未编写的测试 */
     (void)build_test;
+
+    test_build_a_response_flags();
+    test_build_nxdomain_response_flags();
 
     return 0;
 }

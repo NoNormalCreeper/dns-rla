@@ -167,12 +167,14 @@ static void handle_client_query(net_loop_context_t* loop) {
     hosts_lookup_result_t lookup_result =
         hosts_table_lookup(loop->hosts, request.query.qname);
 
-    if (lookup_result.kind == HOSTS_LOOKUP_MISS) {
-        handle_client_query_miss(loop, &request);
+    if (lookup_result.kind != HOSTS_LOOKUP_MISS &&
+        request.query.qtype == DNS_TYPE_A &&
+        request.query.qclass == DNS_CLASS_IN) {
+        send_local_response(loop, &request, lookup_result);
         return;
     }
 
-    send_local_response(loop, &request, lookup_result);
+    handle_client_query_miss(loop, &request);
 }
 
 int net_loop_run(const relay_config_t* config,
@@ -248,7 +250,12 @@ int net_loop_run(const relay_config_t* config,
 
     struct sockaddr_in upstream_addr = {
         .sin_family = AF_INET, .sin_port = htons(config->upstream_port)};
-    inet_aton(config->upstream_dns, &upstream_addr.sin_addr);
+    if (inet_aton(config->upstream_dns, &upstream_addr.sin_addr) == 0) {
+        logger_error("inet_aton() failed for upstream DNS: %s", config->upstream_dns);
+        close(local_sock);
+        close(upstream_sock);
+        return -1;
+    }
 
     if (connect(upstream_sock, (struct sockaddr*)&upstream_addr,
                 sizeof(upstream_addr)) < 0) {
@@ -270,6 +277,10 @@ int net_loop_run(const relay_config_t* config,
 
         if (select(max_fd + 1, &read_fds, NULL, NULL, &timeout) < 0) {
             logger_error("select() failed: %s", strerror(errno));
+            if (errno == EINTR) {
+                continue;  // Interrupted by signal, retry
+            }
+            
             close(local_sock);
             close(upstream_sock);
             return -1;

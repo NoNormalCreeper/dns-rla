@@ -2,6 +2,21 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h> 
+
+uint16_t local_port = 5353;      // 默认本地监听端口
+uint16_t upstream_port = 53;    //默认上游端口参数
+
+int parse_port(const char *str, uint16_t *port) {
+    char *endptr;
+    long val = strtol(str, &endptr, 10);
+    if (*endptr != '\0' || val < 1 || val > 65535) {
+        fprintf(stderr, "Invalid port: %s\n", str);
+        return -1;
+    }
+    *port = (uint16_t)val;
+    return 0;
+}
 
 void config_init_defaults(relay_config_t* config) {
     /* 先给所有字段设置 PPT 参考实现里的默认值。 */
@@ -26,15 +41,42 @@ int config_parse_args(relay_config_t* config, int argc, char** argv) {
      * 参考命令格式把调试选项放在第一个位置。
      * 如果后续要支持任意顺序参数，建议重写成循环解析。
      */
-    if (argi < argc && strcmp(argv[argi], "-d") == 0) {
+     for(argi=1;argi<argc;argi++){
+    if (strcmp(argv[argi], "-d") == 0) {
         config->debug_level = DEBUG_BASIC;
-        argi++;
-    } else if (argi < argc && strcmp(argv[argi], "-dd") == 0) {
+    }else if (strcmp(argv[argi], "-dd") == 0){
         config->debug_level = DEBUG_VERBOSE;
-        argi++;
-    }
+    }else if(strcmp(argv[argi], "-p") == 0){
+        if(argi+1<argc){
 
-    /* 调试选项之后的第一个非选项参数视为外部 DNS 地址。 */
+        if(parse_port(argv[++argi], &config->listen_port) != 0){
+            return -1;
+        }
+
+        local_port=config->listen_port;
+        
+        }else{
+            fprintf(stderr,"missing parameter for -p\n");
+            return -1;
+        }
+    }else if(strcmp(argv[argi], "--upstream-port") == 0){
+        if(argi+1<argc){
+
+        if(parse_port(argv[++argi], &config->upstream_port) != 0){
+            return -1;
+        }
+
+        upstream_port =config->upstream_port;
+
+        }else{
+            fprintf(stderr,"missing parameter for --upstream-port\n");
+            return -1;
+        }}
+        else{
+            break;
+        }
+    }
+     /* 调试选项之后的第一个非选项参数视为外部 DNS 地址。 */
     if (argi < argc) {
         config->upstream_dns = argv[argi++];
     }
@@ -43,19 +85,17 @@ int config_parse_args(relay_config_t* config, int argc, char** argv) {
     if (argi < argc) {
         config->table_file = argv[argi++];
     }
-
     /* 仍有多余参数说明命令行格式不符合当前骨架。 */
     if (argi < argc) {
         return -1;
     }
-
     return 0;
 }
 
 void config_print_usage(const char* program_name) {
     fprintf(stderr,
-            "Usage: %s [-d|-dd] [dns-server-ipaddr] [filename]\n"
+            "Usage: %s [-d|-dd] [-p port] [--upstream-port port] [dns-server-ipaddr] [filename]\n"
             "Defaults: upstream DNS %s, table file %s, listen port %u\n",
             program_name, DNS_RELAY_DEFAULT_DNS, DNS_RELAY_DEFAULT_TABLE,
-            DNS_RELAY_DEFAULT_PORT);
+            local_port);
 }
