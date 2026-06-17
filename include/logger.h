@@ -6,10 +6,22 @@
 /* 初始化全局日志等级。 */
 void logger_init(debug_level_t level);
 
-/* 错误日志总是输出到 stderr。 */
+/*
+ * 禁用全部日志（包括 Error 和 Warning）。
+ * 传入非 0 值禁用。传 0 恢复。
+ */
+void logger_set_forbidden(int forbidden);
+
+/*
+ * 除非禁用日志，否则：
+ * 错误日志总是输出到 stderr。
+ */
 void logger_error(const char* fmt, ...);
 
-/* 普通信息总是输出到 stdout，用于启动配置、表项数量等。 */
+/*
+ * 除非禁用日志，否则：
+ * 普通信息总是输出到 stdout，用于启动配置、表项数量等。
+ */
 void logger_info(const char* fmt, ...);
 
 void logger_warning(const char* fmt, ...);

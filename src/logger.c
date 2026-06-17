@@ -6,6 +6,13 @@
 
 static debug_level_t current_level = DEBUG_NONE;
 
+/* 非零表示禁用日志 */
+static int forbidden = 0;
+
+void logger_set_forbidden(int on) {
+    forbidden = on;
+}
+
 static void logger_vprint(FILE* stream,
                           const char* prefix,
                           const char* fmt,
@@ -41,6 +48,9 @@ void logger_init(debug_level_t level) {
 void logger_error(const char* fmt, ...) {
     va_list args;
 
+    if (forbidden) {
+        return;
+    }
     va_start(args, fmt);
     logger_vprint(stderr, "[ERROR] ", fmt, args);
     va_end(args);
@@ -49,6 +59,9 @@ void logger_error(const char* fmt, ...) {
 void logger_info(const char* fmt, ...) {
     va_list args;
 
+    if (forbidden) {
+        return;
+    }
     va_start(args, fmt);
     logger_vprint(stdout, "[INFO] ", fmt, args);
     va_end(args);
@@ -57,6 +70,9 @@ void logger_info(const char* fmt, ...) {
 void logger_warning(const char* fmt, ...) {
     va_list args;
 
+    if (forbidden) {
+        return;
+    }
     va_start(args, fmt);
     logger_vprint(stdout, "[WARNING] ", fmt, args);
     va_end(args);
@@ -65,6 +81,9 @@ void logger_warning(const char* fmt, ...) {
 void logger_debug(const char* fmt, ...) {
     va_list args;
 
+    if (forbidden) {
+        return;
+    }
     /* -d 和 -dd 都会显示 debug 日志。 */
     if (current_level < DEBUG_BASIC) {
         return;
@@ -78,6 +97,9 @@ void logger_debug(const char* fmt, ...) {
 void logger_verbose(const char* fmt, ...) {
     va_list args;
 
+    if (forbidden) {
+        return;
+    }
     /* verbose 只给 -dd 使用，适合输出较吵的报文细节。 */
     if (current_level < DEBUG_VERBOSE) {
         return;
