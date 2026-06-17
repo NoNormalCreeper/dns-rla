@@ -5,7 +5,7 @@
 #include <string.h>
 
 uint16_t local_port = 5353;   // 默认本地监听端口
-uint16_t upstream_port = 53;  //默认上游端口参数
+uint16_t upstream_port = 53;  // 默认上游端口参数
 
 int parse_port(const char* str, uint16_t* port) {
     char* endptr;

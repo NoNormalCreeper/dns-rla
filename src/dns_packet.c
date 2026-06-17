@@ -135,14 +135,14 @@ static int dns_skip_qname(const ubyte* packet,
  * 排布方式见 RFC 1035 文件。
  */
 typedef struct {
-    unsigned int qr;      /* Query(0) / Response(1) */
-    unsigned int opcode;  /* 操作码，标准查询为 0 */
-    unsigned int aa;      /* 权威应答 */
-    unsigned int tc;      /* 截断 */
-    unsigned int rd;      /* 期望递归 */
-    unsigned int ra;      /* 递归可用 */
-    unsigned int z;       /* 保留字段（须为 0） */
-    unsigned int rcode;   /* 响应码 */
+    unsigned int qr;     /* Query(0) / Response(1) */
+    unsigned int opcode; /* 操作码，标准查询为 0 */
+    unsigned int aa;     /* 权威应答 */
+    unsigned int tc;     /* 截断 */
+    unsigned int rd;     /* 期望递归 */
+    unsigned int ra;     /* 递归可用 */
+    unsigned int z;      /* 保留字段（须为 0） */
+    unsigned int rcode;  /* 响应码 */
 } dns_flags_t;
 
 static dns_flags_t dns_flags_read(const ubyte* wire) {
