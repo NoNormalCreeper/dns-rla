@@ -130,27 +130,38 @@ static int dns_skip_qname(const ubyte* packet,
     }
 }
 
-/* 例如 count = 5 时返回的数值是 0b0000'0000'0001'1111 */
-static uint16_t dns_packet_ones_16(size_t count) {
-    return ~((uint16_t)(~0) << count);
+/*
+ * DNS Flags 结构体的字段就和 Flags 那些部分一一对应。
+ * 排布方式见 RFC 1035 文件。
+ */
+typedef struct {
+    unsigned int qr;      /* Query(0) / Response(1) */
+    unsigned int opcode;  /* 操作码，标准查询为 0 */
+    unsigned int aa;      /* 权威应答 */
+    unsigned int tc;      /* 截断 */
+    unsigned int rd;      /* 期望递归 */
+    unsigned int ra;      /* 递归可用 */
+    unsigned int z;       /* 保留字段（须为 0） */
+    unsigned int rcode;   /* 响应码 */
+} dns_flags_t;
+
+static dns_flags_t dns_flags_read(const ubyte* wire) {
+    dns_flags_t f;
+    f.qr = (wire[0] >> 7) & 1;
+    f.opcode = (wire[0] >> 3) & 0x0F;
+    f.aa = (wire[0] >> 2) & 1;
+    f.tc = (wire[0] >> 1) & 1;
+    f.rd = wire[0] & 1;
+    f.ra = (wire[1] >> 7) & 1;
+    f.z = (wire[1] >> 4) & 0x07;
+    f.rcode = wire[1] & 0x0F;
+    return f;
 }
 
-static uint16_t dns_packet_flags_modify(uint16_t flags,
-                                        size_t bit_index,
-                                        size_t bit_length,
-                                        uint16_t val) {
-    uint16_t src_keep;
-    uint16_t dest_keep;
-
-    src_keep = dns_packet_ones_16(bit_length);
-    dest_keep = ~(src_keep << bit_index);
-
-    return (flags & dest_keep) | ((val & src_keep) << bit_index);
-}
-
-__attribute__((unused)) static uint16_t
-dns_packet_flags_get(uint16_t flags, size_t bit_index, size_t bit_length) {
-    return (flags >> bit_index) & dns_packet_ones_16(bit_length);
+static void dns_flags_write(ubyte* wire, dns_flags_t f) {
+    wire[0] = (ubyte)((f.qr << 7) | (f.opcode << 3) | (f.aa << 2) |
+                      (f.tc << 1) | f.rd);
+    wire[1] = (ubyte)((f.ra << 7) | (f.z << 4) | f.rcode);
 }
 
 uint16_t dns_packet_get_id(const ubyte* packet, size_t packet_len) {
@@ -254,7 +265,7 @@ int dns_packet_build_a_response(const ubyte* query,
 
     size_t qtype_pos;
     size_t question_end;
-    uint16_t flags;
+    dns_flags_t flags;
     ubyte* wp;
 
     /* 直接定位到 Question 结束，顺带检查 Question 合法性 */
@@ -286,15 +297,11 @@ int dns_packet_build_a_response(const ubyte* query,
     wp = response + question_end;
 
     /* 修改 Header */
-    flags = dns_packet_read_u16(response + DNS_FLAGS_INDEX);
-    flags = dns_packet_flags_modify(flags, DNS_FLAGS_QR_BIT_INDEX,
-                                    DNS_FLAGS_QR_BIT_SIZE, 1);
-    flags = dns_packet_flags_modify(flags, DNS_FLAGS_RA_BIT_INDEX,
-                                    DNS_FLAGS_RA_BIT_SIZE, 1);
-    flags =
-        dns_packet_flags_modify(flags, DNS_FLAGS_RCODE_BIT_INDEX,
-                                DNS_FLAGS_RCODE_BIT_SIZE, DNS_RCODE_NOERROR);
-    dns_packet_write_u16(response + DNS_FLAGS_INDEX, flags);
+    flags = dns_flags_read(response + DNS_FLAGS_INDEX);
+    flags.qr = 1;
+    flags.ra = 1;
+    flags.rcode = DNS_RCODE_NOERROR;
+    dns_flags_write(response + DNS_FLAGS_INDEX, flags);
     dns_packet_write_u16(response + DNS_QDCOUNT_INDEX, 1);
     dns_packet_write_u16(response + DNS_ANCOUNT_INDEX, 1);
     dns_packet_write_u16(response + DNS_NSCOUNT_INDEX, 0);
@@ -350,7 +357,7 @@ int dns_packet_build_nxdomain_response(const ubyte* query,
      */
     size_t qtype_pos;
     size_t question_end;
-    uint16_t flags;
+    dns_flags_t flags;
 
     /* 依旧直接定位到 Question 结束，顺带检查 Question 合法性 */
     if (dns_skip_qname(query, query_len, DNS_HEADER_SIZE, NULL, 0,
@@ -380,15 +387,11 @@ int dns_packet_build_nxdomain_response(const ubyte* query,
     memcpy(response, query, question_end);
 
     /* 依旧修改 Header */
-    flags = dns_packet_read_u16(response + DNS_FLAGS_INDEX);
-    flags = dns_packet_flags_modify(flags, DNS_FLAGS_QR_BIT_INDEX,
-                                    DNS_FLAGS_QR_BIT_SIZE, 1);
-    flags = dns_packet_flags_modify(flags, DNS_FLAGS_RA_BIT_INDEX,
-                                    DNS_FLAGS_RA_BIT_SIZE, 1);
-    flags =
-        dns_packet_flags_modify(flags, DNS_FLAGS_RCODE_BIT_INDEX,
-                                DNS_FLAGS_RCODE_BIT_SIZE, DNS_RCODE_NXDOMAIN);
-    dns_packet_write_u16(response + DNS_FLAGS_INDEX, flags);
+    flags = dns_flags_read(response + DNS_FLAGS_INDEX);
+    flags.qr = 1;
+    flags.ra = 1;
+    flags.rcode = DNS_RCODE_NXDOMAIN;
+    dns_flags_write(response + DNS_FLAGS_INDEX, flags);
     dns_packet_write_u16(response + DNS_QDCOUNT_INDEX, 1);
     dns_packet_write_u16(response + DNS_ANCOUNT_INDEX, 0);
     dns_packet_write_u16(response + DNS_NSCOUNT_INDEX, 0);
