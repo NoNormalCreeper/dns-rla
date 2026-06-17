@@ -251,7 +251,8 @@ int net_loop_run(const relay_config_t* config,
     struct sockaddr_in upstream_addr = {
         .sin_family = AF_INET, .sin_port = htons(config->upstream_port)};
     if (inet_aton(config->upstream_dns, &upstream_addr.sin_addr) == 0) {
-        logger_error("inet_aton() failed for upstream DNS: %s", config->upstream_dns);
+        logger_error("inet_aton() failed for upstream DNS: %s",
+                     config->upstream_dns);
         close(local_sock);
         close(upstream_sock);
         return -1;
@@ -280,7 +281,7 @@ int net_loop_run(const relay_config_t* config,
             if (errno == EINTR) {
                 continue;  // Interrupted by signal, retry
             }
-            
+
             close(local_sock);
             close(upstream_sock);
             return -1;
