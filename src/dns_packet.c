@@ -239,6 +239,15 @@ int dns_packet_parse_query(const ubyte* packet,
     return 0;
 }
 
+int dns_packet_extract_cache_ttl(const ubyte* packet,
+                                 size_t packet_len,
+                                 uint32_t* out_ttl_sec) {
+    (void)packet;
+    (void)packet_len;
+    (void)out_ttl_sec;
+    return -1;
+}
+
 int dns_packet_build_a_response(const ubyte* query,
                                 size_t query_len,
                                 uint32_t ipv4_network_order,

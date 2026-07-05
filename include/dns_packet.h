@@ -90,6 +90,16 @@ int dns_packet_parse_query(const ubyte* packet,
                            dns_query_t* question);
 
 /*
+ * 提取可用于 cache 的 TTL。
+ *
+ * 成功时返回 0，并把最小可缓存 TTL 写入 out_ttl_sec。
+ * 不可缓存或报文异常时返回 -1。
+ */
+int dns_packet_extract_cache_ttl(const ubyte* packet,
+                                 size_t packet_len,
+                                 uint32_t* out_ttl_sec);
+
+/*
  * 构造本地命中普通 IP 时的 A 记录响应。
  *
  * ipv4_network_order 必须已经是网络字节序，通常来自 inet_pton()。
