@@ -18,6 +18,8 @@ typedef struct {
     const relay_config_t* config;
     const hosts_table_t* hosts;
     relay_state_t* relay_state;
+    dns_cache_t* cache;
+    dns_stats_t* stats;
 
     int local_sock;
     int upstream_sock;
@@ -33,6 +35,46 @@ typedef struct {
 
     dns_query_t query;
 } client_query_t;
+
+/* 1=hit, 0=miss */
+static int try_send_cached_response(net_loop_context_t* loop,
+                               const client_query_t* request) {
+    ubyte response[DNS_MAX_PACKET_SIZE];
+    size_t response_len = sizeof(response);
+
+    dns_cache_key_t key = {
+        .qtype = request->query.qtype,
+        .qclass = request->query.qclass,
+    };
+    strncpy(key.qname, request->query.qname, DNS_MAX_DOMAIN_LEN);
+
+    int cache_result = dns_cache_get(loop->cache, &key, time(NULL), response,
+                                     response_len, &response_len);
+    if (cache_result == 0) {
+        // cache hit
+        if (dns_packet_set_id(response, response_len, request->query.id) != 0) {
+            logger_error("Failed to set client ID in cached response");
+            return 0;
+        }
+        if (sendto(loop->local_sock, response, response_len, 0,
+                   (const struct sockaddr*)&request->client_addr,
+                   request->client_addr_len) < 0) {
+            logger_error("sendto() cached response to client failed: %s",
+                         strerror(errno));
+            return 1;  // hit，但回客户端失败，退回上游路径也解决不了这个失败
+        }
+        return 1;  // indicate cache hit
+    }
+    if (cache_result == -1) {
+        logger_debug("Cache miss for domain %s", request->query.qname);
+    }
+    if (cache_result == -2) {
+        logger_warning("Cache entry for domain %s is too large to send",
+                       request->query.qname);
+    }
+
+    return 0;  // default to cache miss
+}
 
 static void handle_client_query_miss(net_loop_context_t* loop,
                                      client_query_t* request) {
@@ -175,6 +217,10 @@ static void handle_client_query(net_loop_context_t* loop) {
         return;
     }
 
+    if (try_send_cached_response(loop, &request) == 1) {
+        return;
+    }
+
     handle_client_query_miss(loop, &request);
 }
 
@@ -234,6 +280,8 @@ int net_loop_run(const relay_config_t* config,
         .config = config,
         .hosts = hosts,
         .relay_state = relay_state,
+        .cache = cache,
+        .stats = stats,
         .local_sock = local_sock,
         .upstream_sock = upstream_sock,
     };
