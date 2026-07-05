@@ -17,6 +17,8 @@ The first tests are intentionally small:
 - `test_dns_cache` checks empty-cache misses, successful put/get round trips,
   key matching, expiration, required-length reporting, oversized-packet rejection,
   stale-entry rejection, and full-cache round-robin replacement.
+- `test_dns_stats` checks zero-initialization and that summary logging accepts a
+  populated statistics struct without extra setup.
 
 ## 测试工具约定
 
