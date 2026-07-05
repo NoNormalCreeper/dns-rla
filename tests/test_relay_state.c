@@ -27,6 +27,15 @@ static void check_ipv4_client(const pending_query_t* query,
     TEST_CHECK_EQ_U32(actual->sin_addr.s_addr, expected->sin_addr.s_addr);
 }
 
+static void check_query_identity(const pending_query_t* query,
+                                 const char* expected_qname,
+                                 uint16_t expected_qtype,
+                                 uint16_t expected_qclass) {
+    TEST_CHECK_EQ_STR(query->qname, expected_qname);
+    TEST_CHECK_EQ_U16(query->qtype, expected_qtype);
+    TEST_CHECK_EQ_U16(query->qclass, expected_qclass);
+}
+
 static void test_next_id_skips_in_use_ids(void) {
     relay_state_t state;
     struct sockaddr_in client = make_ipv4_client("192.0.2.10", 53000);
@@ -35,7 +44,8 @@ static void test_next_id_skips_in_use_ids(void) {
     relay_state_init(&state);
     TEST_CHECK_EQ_INT(
         relay_state_add(&state, 1, 0x1234, (const struct sockaddr*)&client,
-                        sizeof(client)),
+                        sizeof(client), "first.test", DNS_TYPE_A,
+                        DNS_CLASS_IN),
         0);
 
     TEST_CHECK_EQ_INT(relay_state_next_id(&state, &forward_id), 0);
@@ -50,7 +60,8 @@ static void test_next_id_wraps_without_returning_zero(void) {
     relay_state_init(&state);
     TEST_CHECK_EQ_INT(
         relay_state_add(&state, UINT16_MAX, 0x1234,
-                        (const struct sockaddr*)&client, sizeof(client)),
+                        (const struct sockaddr*)&client, sizeof(client),
+                        "wrap.test", DNS_TYPE_A, DNS_CLASS_IN),
         0);
     state.next_id = UINT16_MAX;
 
@@ -67,7 +78,8 @@ static void test_add_find_and_remove_preserve_client_info(void) {
 
     TEST_CHECK_EQ_INT(
         relay_state_add(&state, 0x2222, 0x1234, (const struct sockaddr*)&client,
-                        sizeof(client)),
+                        sizeof(client), "www.example.com", DNS_TYPE_A,
+                        DNS_CLASS_IN),
         0);
 
     query = relay_state_find(&state, 0x2222);
@@ -76,6 +88,7 @@ static void test_add_find_and_remove_preserve_client_info(void) {
     TEST_CHECK_EQ_U16(query->forward_id, 0x2222);
     TEST_CHECK_EQ_U16(query->client_id, 0x1234);
     check_ipv4_client(query, &client);
+    check_query_identity(query, "www.example.com", DNS_TYPE_A, DNS_CLASS_IN);
 
     relay_state_remove(&state, 0x2222);
     TEST_CHECK(relay_state_find(&state, 0x2222) == NULL);
@@ -92,17 +105,20 @@ static void test_expire_removes_only_timed_out_entries(void) {
 
     TEST_CHECK_EQ_INT(
         relay_state_add(&state, 0x3333, 0x0101, (const struct sockaddr*)&client,
-                        sizeof(client)),
+                        sizeof(client), "expired.test", DNS_TYPE_A,
+                        DNS_CLASS_IN),
         0);
     TEST_CHECK_EQ_INT(
         relay_state_add(&state, 0x4444, 0x0202, (const struct sockaddr*)&client,
-                        sizeof(client)),
+                        sizeof(client), "active.test", 28, DNS_CLASS_IN),
         0);
 
     expired = relay_state_find(&state, 0x3333);
     active = relay_state_find(&state, 0x4444);
     TEST_CHECK(expired != NULL);
     TEST_CHECK(active != NULL);
+    check_query_identity(expired, "expired.test", DNS_TYPE_A, DNS_CLASS_IN);
+    check_query_identity(active, "active.test", 28, DNS_CLASS_IN);
     expired->created_at = now - DNS_RELAY_PENDING_TIMEOUT_SEC - 1;
     active->created_at = now;
 
@@ -122,13 +138,15 @@ static void test_add_fails_when_pending_table_is_full(void) {
     for (i = 0; i < DNS_RELAY_MAX_PENDING; i++) {
         TEST_CHECK_EQ_INT(
             relay_state_add(&state, (uint16_t)(i + 1), (uint16_t)(0x4000 + i),
-                            (const struct sockaddr*)&client, sizeof(client)),
+                            (const struct sockaddr*)&client, sizeof(client),
+                            "full.test", DNS_TYPE_A, DNS_CLASS_IN),
             0);
     }
 
     TEST_CHECK_EQ_INT(
         relay_state_add(&state, 0xffff, 0x9999, (const struct sockaddr*)&client,
-                        sizeof(client)),
+                        sizeof(client), "overflow.test", DNS_TYPE_A,
+                        DNS_CLASS_IN),
         -1);
 }
 
