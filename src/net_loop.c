@@ -54,7 +54,7 @@ static int try_send_cached_response(net_loop_context_t* loop,
         // cache hit
         if (dns_packet_set_id(response, response_len, request->query.id) != 0) {
             logger_error("Failed to set client ID in cached response");
-            return 0;
+            return 1;
         }
         if (sendto(loop->local_sock, response, response_len, 0,
                    (const struct sockaddr*)&request->client_addr,
