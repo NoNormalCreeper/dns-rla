@@ -8,6 +8,8 @@ int main(int argc, char** argv) {
     relay_config_t config;
     hosts_table_t hosts;
     relay_state_t relay_state;
+    dns_cache_t cache;
+    dns_stats_t stats;
     int parse_result;
     int result;
 
@@ -39,8 +41,11 @@ int main(int argc, char** argv) {
 
     logger_info("loaded %zu host table entries", hosts.count);
 
+    dns_cache_init(&cache);
+    dns_stats_init(&stats);
+
     /* 当前 net_loop 还是骨架；后续真正的 UDP/select 主循环会在这里阻塞运行。 */
-    result = net_loop_run(&config, &hosts, &relay_state);
+    result = net_loop_run(&config, &hosts, &relay_state, &cache, &stats);
 
     hosts_table_free(&hosts);
     return result == 0 ? 0 : 1;

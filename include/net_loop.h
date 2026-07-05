@@ -2,6 +2,8 @@
 #define DNS_RELAY_NET_LOOP_H
 
 #include "config.h"
+#include "dns_cache.h"
+#include "dns_stats.h"
 #include "hosts_table.h"
 #include "relay_state.h"
 
@@ -18,6 +20,8 @@
  */
 int net_loop_run(const relay_config_t* config,
                  const hosts_table_t* hosts,
-                 relay_state_t* relay_state);
+                 relay_state_t* relay_state,
+                 dns_cache_t* cache,
+                 dns_stats_t* stats);
 
 #endif

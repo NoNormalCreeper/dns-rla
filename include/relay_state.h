@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include <sys/socket.h>
+#include "dns_packet.h"
 
 /*
  * 最多同时等待多少个外部 DNS 响应。
@@ -40,6 +41,11 @@ typedef struct {
     /* client_addr 实际长度，sendto() 发回客户端时需要。 */
     socklen_t client_addr_len;
 
+    /* 写 cache 需要的参数 */
+    char qname[DNS_MAX_DOMAIN_LEN + 1];
+    uint16_t qtype;
+    uint16_t qclass;
+
     /* 记录创建时间，用于超时清理和迟到响应处理。 */
     time_t created_at;
 } pending_query_t;
@@ -73,7 +79,10 @@ int relay_state_add(relay_state_t* state,
                     uint16_t forward_id,
                     uint16_t client_id,
                     const struct sockaddr* client_addr,
-                    socklen_t client_addr_len);
+                    socklen_t client_addr_len,
+                    const char* qname,
+                    uint16_t qtype,
+                    uint16_t qclass);
 
 /* 根据外部 DNS 响应里的 forward_id 查找 pending 记录。 */
 pending_query_t* relay_state_find(relay_state_t* state, uint16_t forward_id);
