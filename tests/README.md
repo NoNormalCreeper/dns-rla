@@ -14,6 +14,9 @@ The first tests are intentionally small:
   rest of the packet.
 - `test_relay_state` checks pending ID allocation, client mapping, removal,
   timeout cleanup, and full-table failure behavior.
+- `test_dns_cache` checks empty-cache misses, successful put/get round trips,
+  key matching, expiration, required-length reporting, oversized-packet rejection,
+  stale-entry rejection, and full-cache round-robin replacement.
 
 ## 测试工具约定
 

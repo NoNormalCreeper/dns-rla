@@ -19,9 +19,9 @@ TARGET := dnsrelay$(EXEEXT)
 SRC := $(wildcard src/*.c)
 OBJ := $(patsubst src/%.c,build/%.o,$(SRC))
 TEST_TARGETS := build/test_hosts_table build/test_dns_packet build/test_common \
-	build/test_relay_state
+	build/test_relay_state build/test_dns_cache
 TEST_RUN_TARGETS := run-test-hosts-table run-test-dns-packet run-test-common \
-	run-test-relay-state
+	run-test-relay-state run-test-dns-cache
 
 .PHONY: all clean run test $(TEST_RUN_TARGETS)
 
@@ -54,6 +54,9 @@ run-test-common: build/test_common
 run-test-relay-state: build/test_relay_state
 	./build/test_relay_state
 
+run-test-dns-cache: build/test_dns_cache
+	./build/test_dns_cache
+
 build/test_hosts_table: tests/test_hosts_table.c tests/test_support.h \
 	src/hosts_table.c src/common.c | build
 	$(CC) $(CFLAGS) tests/test_hosts_table.c src/hosts_table.c src/common.c -o $@ $(LDFLAGS)
@@ -68,6 +71,10 @@ build/test_common: tests/test_common.c tests/test_support.h src/common.c | build
 build/test_relay_state: tests/test_relay_state.c tests/test_support.h \
 	src/relay_state.c | build
 	$(CC) $(CFLAGS) tests/test_relay_state.c src/relay_state.c -o $@ $(LDFLAGS)
+
+build/test_dns_cache: tests/test_dns_cache.c tests/test_support.h \
+	src/dns_cache.c | build
+	$(CC) $(CFLAGS) tests/test_dns_cache.c src/dns_cache.c -o $@ $(LDFLAGS)
 
 clean:
 	rm -rf build $(TARGET)
