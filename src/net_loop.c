@@ -4,14 +4,17 @@
 #include <netinet/in.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include "common.h"
+#include "dns_cache.h"
 #include "dns_packet.h"
 
 #include "hosts_table.h"
 #include "logger.h"
+#include "relay_state.h"
 
 // 整个事件循环长期持有的资源
 typedef struct {
@@ -38,7 +41,7 @@ typedef struct {
 
 /* 1=hit, 0=miss */
 static int try_send_cached_response(net_loop_context_t* loop,
-                               const client_query_t* request) {
+                                    const client_query_t* request) {
     ubyte response[DNS_MAX_PACKET_SIZE];
     size_t response_len = sizeof(response);
 
@@ -46,7 +49,7 @@ static int try_send_cached_response(net_loop_context_t* loop,
         .qtype = request->query.qtype,
         .qclass = request->query.qclass,
     };
-    strncpy(key.qname, request->query.qname, DNS_MAX_DOMAIN_LEN);
+    strncpy(key.qname, request->query.qname, sizeof(key.qname));
 
     int cache_result = dns_cache_get(loop->cache, &key, time(NULL), response,
                                      response_len, &response_len);
@@ -112,6 +115,25 @@ static void handle_client_query_miss(net_loop_context_t* loop,
         forward_id, client_id);
 }
 
+static void write_upstream_cache(net_loop_context_t* loop,
+                                 const ubyte* response,
+                                 ssize_t response_size,
+                                 const pending_query_t* query) {
+    uint32_t out_ttl_sec;
+    if (dns_packet_extract_cache_ttl(response, response_size, &out_ttl_sec) <
+        0) {
+        logger_debug(
+            "Extract cache ttl return < 0");  // 可能是错误或者不允许缓存，记录即可
+        return;
+    }
+
+    time_t expires_at = time(NULL) + out_ttl_sec;
+    dns_cache_key_t key = {.qtype = query->qtype, .qclass = query->qclass};
+    strncpy(key.qname, query->qname, sizeof(key.qname));
+
+    dns_cache_put(loop->cache, &key, response, response_size, expires_at);
+}
+
 static void handle_upstream_response(net_loop_context_t* loop) {
     ubyte response[DNS_MAX_PACKET_SIZE];
     ssize_t response_size =
@@ -150,6 +172,9 @@ static void handle_upstream_response(net_loop_context_t* loop) {
     logger_debug(
         "Relayed response with forward ID %u (client ID %u) back to client",
         forward_id, pending->client_id);
+
+    // 写 cache
+    write_upstream_cache(loop, response, response_size, pending);
 
     // 请求完成，删除 state
     relay_state_remove(loop->relay_state, forward_id);
