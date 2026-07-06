@@ -3,7 +3,8 @@
 
 #include <limits.h>
 #include <stdbool.h>
-
+#include <stddef.h>
+#include <sys/socket.h>
 /* C 标准并未保证 CHAR_BIT 等于 8 */
 #if CHAR_BIT != 8
 #error "CHAR_BIT != 8"
@@ -28,5 +29,10 @@ void normalize_domain(char* domain);
  * 校验一个域名是否合法。
  */
 bool is_valid_domain(const char* domain);
+/*
 
+*/
+int socketaddr_to_string(const struct sockaddr *addr,
+                        char *out_buf,
+                        size_t out_buf_size);
 #endif /* DNS_RELAY_COMMON_H */

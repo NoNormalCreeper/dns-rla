@@ -1,4 +1,6 @@
 #include "relay_state.h"
+#include "common.h"
+#include "logger.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -68,6 +70,7 @@ int relay_state_add(relay_state_t* state,
     for (i = 0; i < DNS_RELAY_MAX_PENDING; i++) {
         pending_query_t* slot = &state->pending[i];
 
+
         if (!slot->in_use) {
             /*
              * 保存原客户端地址和原始 ID。
@@ -83,6 +86,13 @@ int relay_state_add(relay_state_t* state,
             slot->created_at = time(NULL);
             memcpy(&slot->client_addr, client_addr, client_addr_len);
             memcpy(slot->qname, qname, DNS_MAX_DOMAIN_LEN + 1);
+        char client_addr_buf[48];
+
+        if(socketaddr_to_string((const struct sockaddr*)&slot->client_addr,client_addr_buf,sizeof(client_addr_buf))==0){
+        logger_verbose("[PENDING] ADD: client_id: %u ,forward_id: %u, client_addr_len: %u, client_addr: %s",
+            client_id,forward_id,client_addr_len,client_addr_buf
+            );
+        }
             return 0;
         }
     }
@@ -109,6 +119,13 @@ void relay_state_remove(relay_state_t* state, uint16_t forward_id) {
 
     /* 清零后该槽位可被下一条请求复用。 */
     if (query != NULL) {
+    char client_addr_buf[48];
+
+    if(socketaddr_to_string((const struct sockaddr*)&query->client_addr,client_addr_buf,sizeof(client_addr_buf))==0){
+    logger_verbose("[PENDING]: forward_id: %u, client_id: %u, client_addr_len: %u ,client_addr: %s",
+        query->forward_id,query->client_id,query->client_addr_len,client_addr_buf);
+    }
+
         memset(query, 0, sizeof(*query));
     }
 }
@@ -126,6 +143,13 @@ void relay_state_expire(relay_state_t* state, time_t now) {
         if (query->in_use &&
             now - query->created_at > DNS_RELAY_PENDING_TIMEOUT_SEC) {
             /* 迟到响应回来后会查不到该记录，net_loop 应丢弃它。 */
+        char client_addr_buf[48];
+
+        if(socketaddr_to_string((const struct sockaddr*)&query->client_addr,client_addr_buf,sizeof(client_addr_buf))==0){
+        logger_verbose("[PENDING]: forward_id: %u, client_id: %u, client_addr_len: %u ,client_addr: %s",
+             query->forward_id,query->client_id,query->client_addr_len,client_addr_buf);
+        }
+
             memset(query, 0, sizeof(*query));
         }
     }
