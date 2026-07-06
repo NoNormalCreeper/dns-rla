@@ -44,8 +44,7 @@ static void test_next_id_skips_in_use_ids(void) {
     relay_state_init(&state);
     TEST_CHECK_EQ_INT(
         relay_state_add(&state, 1, 0x1234, (const struct sockaddr*)&client,
-                        sizeof(client), "first.test", DNS_TYPE_A,
-                        DNS_CLASS_IN),
+                        sizeof(client), "first.test", DNS_TYPE_A, DNS_CLASS_IN),
         0);
 
     TEST_CHECK_EQ_INT(relay_state_next_id(&state, &forward_id), 0);

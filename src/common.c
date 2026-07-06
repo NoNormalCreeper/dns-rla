@@ -86,28 +86,29 @@ bool is_valid_domain(const char* domain) {
     return true;
 }
 
-int socketaddr_to_string(const struct sockaddr *addr,
-                        char *out_buf,
-                        size_t out_buf_size){
-    struct sockaddr_in * addr_in;//强转后的IPV4地址结构体
+int socketaddr_to_string(const struct sockaddr* addr,
+                         char* out_buf,
+                         size_t out_buf_size) {
+    struct sockaddr_in* addr_in;  // 强转后的IPV4地址结构体
     char ip_str[INET_ADDRSTRLEN];
     uint16_t port;
 
-    //检测是否合法
-    if (addr == NULL || out_buf == NULL || out_buf_size == 0){
+    // 检测是否合法
+    if (addr == NULL || out_buf == NULL || out_buf_size == 0) {
         return -1;
     }
 
-    //只处理IPV4
-    if (addr->sa_family != AF_INET){
+    // 只处理IPV4
+    if (addr->sa_family != AF_INET) {
         return -1;
     }
 
     addr_in = (struct sockaddr_in*)addr;
-    //把网络字节序转为主机字节序
+    // 把网络字节序转为主机字节序
     port = ntohs(addr_in->sin_port);
-    //把32为网络字节序IP转为点分十进制字符串
-    if (inet_ntop(AF_INET, &addr_in->sin_addr, ip_str, sizeof(ip_str)) == NULL) {
+    // 把32为网络字节序IP转为点分十进制字符串
+    if (inet_ntop(AF_INET, &addr_in->sin_addr, ip_str, sizeof(ip_str)) ==
+        NULL) {
         return -1;
     }
 

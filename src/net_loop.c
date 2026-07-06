@@ -162,12 +162,14 @@ static void handle_upstream_response(net_loop_context_t* loop) {
                            forward_id);  // 上游响应也已经被消费了
         return;
     }
-    //查询域名
+    // 查询域名
     dns_query_t query;
     dns_packet_parse_query(response, (size_t)response_size, &query);
 
-    logger_verbose("[RESPONSE] RELAY: domain=%s, forward_id=%u, client_id=%u, upstream=%s",
-                    query.qname, forward_id, pending->client_id, loop->config->upstream_dns);
+    logger_verbose(
+        "[RESPONSE] RELAY: domain=%s, forward_id=%u, client_id=%u, upstream=%s",
+        query.qname, forward_id, pending->client_id,
+        loop->config->upstream_dns);
 
     if (sendto(loop->local_sock, response, (size_t)response_size, 0,
                (const struct sockaddr*)&pending->client_addr,
@@ -191,12 +193,14 @@ static void send_local_response(net_loop_context_t* loop,
                                 hosts_lookup_result_t lookup_result) {
     ubyte response[DNS_MAX_PACKET_SIZE];
     size_t response_len = 0;
-    
+
     char buf[48];
-    socketaddr_to_string((struct sockaddr*)&request->client_addr, buf, sizeof(buf));
-    
+    socketaddr_to_string((struct sockaddr*)&request->client_addr, buf,
+                         sizeof(buf));
+
     char ip_buf[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &lookup_result.ipv4_network_order, ip_buf, sizeof(ip_buf));
+    inet_ntop(AF_INET, &lookup_result.ipv4_network_order, ip_buf,
+              sizeof(ip_buf));
 
     if (lookup_result.kind == HOSTS_LOOKUP_BLOCKED) {
         if (dns_packet_build_nxdomain_response(
@@ -204,11 +208,10 @@ static void send_local_response(net_loop_context_t* loop,
                 DNS_MAX_PACKET_SIZE, &response_len) != 0) {
             logger_error("Failed to build NXDOMAIN response");
             return;
-        }
-        else{
+        } else {
             logger_verbose("[RESPONSE] LOCAL NXDOMAIN: domain=%s, client=%s",
-            request->query.qname,buf);
-            }
+                           request->query.qname, buf);
+        }
     } else if (lookup_result.kind == HOSTS_LOOKUP_ADDRESS) {
         if (dns_packet_build_a_response(request->packet, request->packet_len,
                                         lookup_result.ipv4_network_order,
@@ -216,11 +219,9 @@ static void send_local_response(net_loop_context_t* loop,
                                         &response_len) != 0) {
             logger_error("Failed to build A response");
             return;
-        }
-        else{
+        } else {
             logger_verbose("[RESPONSE] LOCAL A: domain=%s, ip=%s, client=%s",
-            request->query.qname,ip_buf,buf
-            );
+                           request->query.qname, ip_buf, buf);
         }
     };
 
@@ -255,19 +256,21 @@ static void handle_client_query(net_loop_context_t* loop) {
 
     char client_addr_buf[INET6_ADDRSTRLEN];
 
-    if(socketaddr_to_string((struct sockaddr*)&request.client_addr,client_addr_buf,(size_t)sizeof(client_addr_buf))!=0){
-        return ;
+    if (socketaddr_to_string((struct sockaddr*)&request.client_addr,
+                             client_addr_buf,
+                             (size_t)sizeof(client_addr_buf)) != 0) {
+        return;
     }
-    
+
     hosts_lookup_result_t lookup_result =
         hosts_table_lookup(loop->hosts, request.query.qname);
-    
-    logger_debug("client IP address and port is %s, Domain is %s, Type: %s",
-             client_addr_buf, request.query.qname,
-             lookup_result.kind == HOSTS_LOOKUP_ADDRESS  ? "ADDRESS"  :
-             lookup_result.kind == HOSTS_LOOKUP_BLOCKED  ? "BLOCKED"  :
-             lookup_result.kind == HOSTS_LOOKUP_MISS     ? "MISS"     : "UNKNOWN");
 
+    logger_debug("client IP address and port is %s, Domain is %s, Type: %s",
+                 client_addr_buf, request.query.qname,
+                 lookup_result.kind == HOSTS_LOOKUP_ADDRESS   ? "ADDRESS"
+                 : lookup_result.kind == HOSTS_LOOKUP_BLOCKED ? "BLOCKED"
+                 : lookup_result.kind == HOSTS_LOOKUP_MISS    ? "MISS"
+                                                              : "UNKNOWN");
 
     if (lookup_result.kind != HOSTS_LOOKUP_MISS &&
         request.query.qtype == DNS_TYPE_A &&

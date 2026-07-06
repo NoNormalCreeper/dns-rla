@@ -47,10 +47,9 @@ static void test_get_misses_on_empty_cache(void) {
 
     dns_cache_init(&cache);
 
-    TEST_CHECK_EQ_INT(
-        dns_cache_get(&cache, &key, 100, response, sizeof(response),
-                      &response_len),
-        -1);
+    TEST_CHECK_EQ_INT(dns_cache_get(&cache, &key, 100, response,
+                                    sizeof(response), &response_len),
+                      -1);
 }
 
 static void test_put_then_get_round_trips_response(void) {
@@ -65,17 +64,17 @@ static void test_put_then_get_round_trips_response(void) {
 
     TEST_CHECK_EQ_INT(dns_cache_put(&cache, &key, stored, sizeof(stored), 200),
                       0);
-    TEST_CHECK_EQ_INT(
-        dns_cache_get(&cache, &key, 100, fetched, sizeof(fetched),
-                      &fetched_len),
-        0);
+    TEST_CHECK_EQ_INT(dns_cache_get(&cache, &key, 100, fetched, sizeof(fetched),
+                                    &fetched_len),
+                      0);
     TEST_CHECK_EQ_SIZE(fetched_len, sizeof(stored));
     TEST_CHECK_EQ_INT(memcmp(fetched, stored, sizeof(stored)), 0);
 }
 
 static void test_get_distinguishes_qname_qtype_and_qclass(void) {
     dns_cache_t cache;
-    dns_cache_key_t base = make_key("www.example.com", DNS_TYPE_A, DNS_CLASS_IN);
+    dns_cache_key_t base =
+        make_key("www.example.com", DNS_TYPE_A, DNS_CLASS_IN);
     dns_cache_key_t other_name =
         make_key("www.example.org", DNS_TYPE_A, DNS_CLASS_IN);
     dns_cache_key_t other_type = make_key("www.example.com", 28, DNS_CLASS_IN);
@@ -90,18 +89,15 @@ static void test_get_distinguishes_qname_qtype_and_qclass(void) {
     TEST_CHECK_EQ_INT(dns_cache_put(&cache, &base, stored, sizeof(stored), 300),
                       0);
 
-    TEST_CHECK_EQ_INT(
-        dns_cache_get(&cache, &other_name, 100, fetched, sizeof(fetched),
-                      &fetched_len),
-        -1);
-    TEST_CHECK_EQ_INT(
-        dns_cache_get(&cache, &other_type, 100, fetched, sizeof(fetched),
-                      &fetched_len),
-        -1);
-    TEST_CHECK_EQ_INT(
-        dns_cache_get(&cache, &other_class, 100, fetched, sizeof(fetched),
-                      &fetched_len),
-        -1);
+    TEST_CHECK_EQ_INT(dns_cache_get(&cache, &other_name, 100, fetched,
+                                    sizeof(fetched), &fetched_len),
+                      -1);
+    TEST_CHECK_EQ_INT(dns_cache_get(&cache, &other_type, 100, fetched,
+                                    sizeof(fetched), &fetched_len),
+                      -1);
+    TEST_CHECK_EQ_INT(dns_cache_get(&cache, &other_class, 100, fetched,
+                                    sizeof(fetched), &fetched_len),
+                      -1);
 }
 
 static void test_expired_entry_is_treated_as_miss(void) {
@@ -136,10 +132,9 @@ static void test_get_reports_needed_length_when_buffer_is_too_small(void) {
 
     TEST_CHECK_EQ_INT(dns_cache_put(&cache, &key, stored, sizeof(stored), 200),
                       0);
-    TEST_CHECK_EQ_INT(
-        dns_cache_get(&cache, &key, 100, fetched, sizeof(fetched),
-                      &fetched_len),
-        -2);
+    TEST_CHECK_EQ_INT(dns_cache_get(&cache, &key, 100, fetched, sizeof(fetched),
+                                    &fetched_len),
+                      -2);
     TEST_CHECK_EQ_SIZE(fetched_len, sizeof(stored));
 }
 
@@ -151,15 +146,14 @@ static void test_put_rejects_packets_larger_than_dns_limit(void) {
     dns_cache_init(&cache);
     fill_response(stored, sizeof(stored), 0x33);
 
-    TEST_CHECK_EQ_INT(
-        dns_cache_put(&cache, &key, stored, sizeof(stored), 200), -1);
+    TEST_CHECK_EQ_INT(dns_cache_put(&cache, &key, stored, sizeof(stored), 200),
+                      -1);
 }
 
 static void test_round_robin_replaces_oldest_after_cache_is_full(void) {
     dns_cache_t cache;
     dns_cache_key_t first = make_key("name-0.test", DNS_TYPE_A, DNS_CLASS_IN);
-    dns_cache_key_t last =
-        make_key("overflow.test", DNS_TYPE_A, DNS_CLASS_IN);
+    dns_cache_key_t last = make_key("overflow.test", DNS_TYPE_A, DNS_CLASS_IN);
     ubyte stored[4];
     ubyte fetched[4];
     size_t fetched_len = 0;
@@ -183,14 +177,12 @@ static void test_round_robin_replaces_oldest_after_cache_is_full(void) {
     TEST_CHECK_EQ_INT(dns_cache_put(&cache, &last, stored, sizeof(stored), 600),
                       0);
 
-    TEST_CHECK_EQ_INT(
-        dns_cache_get(&cache, &first, 100, fetched, sizeof(fetched),
-                      &fetched_len),
-        -1);
-    TEST_CHECK_EQ_INT(
-        dns_cache_get(&cache, &last, 100, fetched, sizeof(fetched),
-                      &fetched_len),
-        0);
+    TEST_CHECK_EQ_INT(dns_cache_get(&cache, &first, 100, fetched,
+                                    sizeof(fetched), &fetched_len),
+                      -1);
+    TEST_CHECK_EQ_INT(dns_cache_get(&cache, &last, 100, fetched,
+                                    sizeof(fetched), &fetched_len),
+                      0);
     TEST_CHECK_EQ_SIZE(fetched_len, sizeof(stored));
     TEST_CHECK_EQ_INT(memcmp(fetched, stored, sizeof(stored)), 0);
 }

@@ -30,11 +30,10 @@ static void write_u32_be(ubyte* p, uint32_t value) {
 #define EXAMPLE_ANSWER_RDLENGTH_OFFSET (EXAMPLE_ANSWER_OFFSET + 10)
 
 static size_t build_example_a_response(ubyte* response, uint32_t ttl_sec) {
-    ubyte query[] = {0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00,
-                     0x00, 0x00, 0x00, 0x00, 0x00, 3,    'w',
-                     'w',  'w',  7,    'e',  'x',  'a',  'm',
-                     'p',  'l',  'e',  3,    'c',  'o',  'm',
-                     0,    0x00, 0x01, 0x00, 0x01};
+    ubyte query[] = {0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+                     0x00, 0x00, 0x00, 3,    'w',  'w',  'w',  7,    'e',
+                     'x',  'a',  'm',  'p',  'l',  'e',  3,    'c',  'o',
+                     'm',  0,    0x00, 0x01, 0x00, 0x01};
     size_t response_len = 0;
 
     TEST_CHECK_EQ_INT(
@@ -145,11 +144,10 @@ static void test_extract_cache_ttl_rejects_zero_ttl(void) {
 }
 
 static void test_extract_cache_ttl_rejects_nxdomain(void) {
-    ubyte query[] = {0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
-                     0x00, 0x00, 0x00, 0x00, 3,    'w',  'w',  'w',
-                     7,    'e',  'x',  'a',  'm',  'p',  'l',  'e',
-                     3,    'c',  'o',  'm',  0,    0x00, 0x01, 0x00,
-                     0x01};
+    ubyte query[] = {0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+                     0x00, 0x00, 0x00, 3,    'w',  'w',  'w',  7,    'e',
+                     'x',  'a',  'm',  'p',  'l',  'e',  3,    'c',  'o',
+                     'm',  0,    0x00, 0x01, 0x00, 0x01};
     ubyte response[DNS_MAX_PACKET_SIZE];
     size_t response_len = 0;
     uint32_t ttl_sec = 12345;

@@ -32,7 +32,7 @@ bool is_valid_domain(const char* domain);
 /*
 
 */
-int socketaddr_to_string(const struct sockaddr *addr,
-                        char *out_buf,
-                        size_t out_buf_size);
+int socketaddr_to_string(const struct sockaddr* addr,
+                         char* out_buf,
+                         size_t out_buf_size);
 #endif /* DNS_RELAY_COMMON_H */
