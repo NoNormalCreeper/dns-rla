@@ -22,8 +22,7 @@ static uint16_t dns_packet_read_u16(const ubyte* start) {
     return ntohs(buf);
 }
 
-__attribute__((unused)) static uint32_t dns_packet_read_u32(
-    const ubyte* start) {
+static uint32_t dns_packet_read_u32(const ubyte* start) {
     uint32_t buf;
     memcpy(&buf, start, sizeof buf);
     return ntohl(buf);
@@ -297,10 +296,101 @@ static int dns_skip_name(const ubyte* packet,
 int dns_packet_extract_cache_ttl(const ubyte* packet,
                                  size_t packet_len,
                                  uint32_t* out_ttl_sec) {
-    (void)packet;
-    (void)packet_len;
-    (void)out_ttl_sec;
-    return -1;
+    size_t pos;
+    dns_flags_t flags;
+    uint16_t qdcount;
+    uint16_t ancount;
+    uint32_t min_ttl;
+    int has_cached;
+    uint16_t i;
+    size_t name_end;
+
+    /* 长度 */
+    if (packet_len < DNS_HEADER_SIZE) {
+        return -1;
+    }
+
+    /* Flags */
+    flags = dns_flags_read(packet + DNS_FLAGS_INDEX);
+    if (flags.qr != 1) {
+        return -1;
+    }
+    if (flags.rcode != DNS_RCODE_NOERROR) {
+        return -1;
+    }
+    if (flags.tc != 0) {
+        return -1;
+    }
+
+    /* Question 段跳过 */
+    qdcount = dns_packet_read_u16(packet + DNS_QDCOUNT_INDEX);
+    pos = DNS_HEADER_SIZE;
+    for (i = 0; i < qdcount; ++i) {
+        if (dns_skip_name(packet, packet_len, pos, &name_end) != 0) {
+            return -1;
+        }
+        pos = name_end;
+        /* 跳过 QTYPE (2) 和 QCLASS (2) */
+        if (pos + 4 > packet_len) {
+            return -1;
+        }
+        pos += 4;
+    }
+
+    /* 遍历 Answer RR，寻找可缓存的 A 记录 */
+    ancount = dns_packet_read_u16(packet + DNS_ANCOUNT_INDEX);
+    min_ttl = 0;
+    has_cached = 0;
+
+    for (i = 0; i < ancount; ++i) {
+        uint16_t rtype;
+        uint16_t rclass;
+        uint32_t ttl;
+        uint16_t rdlength;
+
+        /* NAME */
+        if (dns_skip_name(packet, packet_len, pos, &name_end) != 0) {
+            return -1;
+        }
+        pos = name_end;
+
+        /* TYPE，CLASS，TTL，RDLENGTH */
+        if (pos + 10 > packet_len) {
+            return -1;
+        }
+
+        rtype = dns_packet_read_u16(packet + pos);
+        rclass = dns_packet_read_u16(packet + pos + 2);
+        ttl = dns_packet_read_u32(packet + pos + 4);
+        rdlength = dns_packet_read_u16(packet + pos + 8);
+
+        pos += 10;
+
+        /* RDATA */
+        if (pos + rdlength > packet_len) {
+            return -1;
+        }
+
+        if (rtype == DNS_TYPE_A && rclass == DNS_CLASS_IN && rdlength == 4 &&
+            ttl > 0) {
+            if (!has_cached || ttl < min_ttl) {
+                min_ttl = ttl;
+                has_cached = 1;
+            }
+        }
+
+        pos += rdlength;
+    }
+
+    if (!has_cached) {
+        /* 没有可用的 A 记录 */
+        return -1;
+    }
+
+    if (out_ttl_sec != NULL) {
+        *out_ttl_sec = min_ttl;
+    }
+    return 0;
 }
 
 int dns_packet_build_a_response(const ubyte* query,
