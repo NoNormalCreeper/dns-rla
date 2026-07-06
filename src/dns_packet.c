@@ -239,6 +239,61 @@ int dns_packet_parse_query(const ubyte* packet,
     return 0;
 }
 
+/*
+ * 遍历 NAME 字段（支持压缩指针），会给出 NAME 结束后的偏移。
+ * 其实是仿照的 dns_skip_qname ，但是会接受压缩指针 0xC0xx。
+ */
+static int dns_skip_name(const ubyte* packet,
+                         size_t packet_len,
+                         size_t start_offset,
+                         size_t* end_offset) {
+    size_t pos = start_offset;
+
+    while (1) {
+        ubyte b;
+
+        if (pos >= packet_len) {
+            logger_error(
+                "%s(): Expecting length byte, 0x00, or compression "
+                "pointer for name",
+                __func__);
+            return -1;
+        }
+
+        b = packet[pos];
+
+        if (b == 0x00) {
+            /* 合法的 NAME 终止符 */
+            *end_offset = pos + 1;
+            return 0;
+        }
+
+        if ((b & 0xC0) == 0xC0) {
+            /* 压缩指针：2 字节，跳过后即结束 */
+            if (pos + 2 > packet_len) {
+                logger_error("%s(): Truncated compression pointer", __func__);
+                return -1;
+            }
+            *end_offset = pos + 2;
+            return 0;
+        }
+
+        if (b > 63) {
+            /* 保留值（0x40-0xBF），非法 */
+            logger_error("%s(): Reserved label length: %u", __func__, b);
+            return -1;
+        }
+
+        /* 普通标签：跳过 1 字节长度 + 标签内容 */
+        pos += 1;
+        if (pos + b > packet_len) {
+            logger_error("%s(): Label content longer than packet", __func__);
+            return -1;
+        }
+        pos += b;
+    }
+}
+
 int dns_packet_extract_cache_ttl(const ubyte* packet,
                                  size_t packet_len,
                                  uint32_t* out_ttl_sec) {
