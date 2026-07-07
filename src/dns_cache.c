@@ -1,7 +1,14 @@
 #include "dns_cache.h"
 
 void dns_cache_init(dns_cache_t* cache) {
-    (void)cache;
+    size_t i;
+
+    for (i = 0; i < DNS_CACHE_CAPACITY; i++) {
+        cache->entries[i].in_use = 0;
+        cache->entries[i].response_len = 0;
+        cache->entries[i].expires_at = 0;
+    }
+    cache->next_replace = 0;
 }
 
 int dns_cache_get(const dns_cache_t* cache,
