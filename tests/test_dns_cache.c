@@ -1,6 +1,6 @@
 #include "dns_cache.h"
-#include "test_support.h"
 #include "logger.h"
+#include "test_support.h"
 
 #include <string.h>
 #include <time.h>
