@@ -49,7 +49,9 @@ int dns_cache_get(const dns_cache_t* cache,
                 "%s(): Cached response too long to copy: %zu bytes, while "
                 "capacity = %zu bytes",
                 __func__, entry->response_len, response_capacity);
-            return -1;
+            /* 此时还是要将缓存的长度给出去 */
+            *response_len = entry->response_len;
+            return -2;
         }
 
         memcpy(response, entry->response, entry->response_len);
@@ -59,6 +61,7 @@ int dns_cache_get(const dns_cache_t* cache,
     }
 
     logger_warning("%s(): Cache miss", __func__);
+    return -1;
 }
 
 int dns_cache_put(dns_cache_t* cache,
