@@ -1,5 +1,6 @@
 #include "dns_cache.h"
 #include "test_support.h"
+#include "logger.h"
 
 #include <string.h>
 #include <time.h>
@@ -132,9 +133,11 @@ static void test_get_reports_needed_length_when_buffer_is_too_small(void) {
 
     TEST_CHECK_EQ_INT(dns_cache_put(&cache, &key, stored, sizeof(stored), 200),
                       0);
+    logger_set_forbidden(1);
     TEST_CHECK_EQ_INT(dns_cache_get(&cache, &key, 100, fetched, sizeof(fetched),
                                     &fetched_len),
                       -2);
+    logger_set_forbidden(0);
     TEST_CHECK_EQ_SIZE(fetched_len, sizeof(stored));
 }
 
@@ -146,8 +149,10 @@ static void test_put_rejects_packets_larger_than_dns_limit(void) {
     dns_cache_init(&cache);
     fill_response(stored, sizeof(stored), 0x33);
 
+    logger_set_forbidden(1);
     TEST_CHECK_EQ_INT(dns_cache_put(&cache, &key, stored, sizeof(stored), 200),
                       -1);
+    logger_set_forbidden(0);
 }
 
 static void test_round_robin_replaces_oldest_after_cache_is_full(void) {

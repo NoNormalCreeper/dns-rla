@@ -56,11 +56,11 @@ int dns_cache_get(const dns_cache_t* cache,
 
         memcpy(response, entry->response, entry->response_len);
         *response_len = entry->response_len;
-        logger_info("%s(): Cache hit", __func__);
+        logger_debug("%s(): Cache hit", __func__);
         return 0;
     }
 
-    logger_warning("%s(): Cache miss", __func__);
+    logger_debug("%s(): Cache miss", __func__);
     return -1;
 }
 
