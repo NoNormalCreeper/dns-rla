@@ -76,8 +76,8 @@ build/test_relay_state: tests/test_relay_state.c tests/test_support.h \
 	$(CC) $(CFLAGS) tests/test_relay_state.c src/relay_state.c src/common.c src/logger.c -o $@ $(LDFLAGS)
 
 build/test_dns_cache: tests/test_dns_cache.c tests/test_support.h \
-	src/dns_cache.c | build
-	$(CC) $(CFLAGS) tests/test_dns_cache.c src/dns_cache.c -o $@ $(LDFLAGS)
+	src/dns_cache.c src/logger.c | build
+	$(CC) $(CFLAGS) tests/test_dns_cache.c src/dns_cache.c src/logger.c -o $@ $(LDFLAGS)
 
 build/test_dns_stats: tests/test_dns_stats.c tests/test_support.h \
 	src/dns_stats.c src/logger.c | build
