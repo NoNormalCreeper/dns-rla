@@ -20,13 +20,45 @@ int dns_cache_get(const dns_cache_t* cache,
                   ubyte* response,
                   size_t response_capacity,
                   size_t* response_len) {
-    (void)cache;
-    (void)key;
-    (void)now;
-    (void)response;
-    (void)response_capacity;
-    (void)response_len;
-    return -1;
+    size_t i;
+
+    for (i = 0; i < DNS_CACHE_CAPACITY; ++i) {
+        const dns_cache_entry_t* entry;
+
+        entry = cache->entries + i;
+        if (!(entry->in_use)) {
+            continue;
+        }
+        if (entry->expires_at <= now) {
+            continue;
+        }
+        if (strcmp(entry->key.qname, key->qname) != 0) {
+            continue;
+        }
+        if (entry->key.qtype != key->qtype) {
+            continue;
+        }
+        if (entry->key.qclass != key->qclass) {
+            continue;
+        }
+
+        /* 命中 */
+
+        if (response_capacity < entry->response_len) {
+            logger_error(
+                "%s(): Cached response too long to copy: %zu bytes, while "
+                "capacity = %zu bytes",
+                __func__, entry->response_len, response_capacity);
+            return -1;
+        }
+
+        memcpy(response, entry->response, entry->response_len);
+        *response_len = entry->response_len;
+        logger_info("%s(): Cache hit", __func__);
+        return 0;
+    }
+
+    logger_warning("%s(): Cache miss", __func__);
 }
 
 int dns_cache_put(dns_cache_t* cache,
