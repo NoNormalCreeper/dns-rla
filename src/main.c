@@ -46,6 +46,7 @@ int main(int argc, char** argv) {
 
     /* 当前 net_loop 还是骨架；后续真正的 UDP/select 主循环会在这里阻塞运行。 */
     result = net_loop_run(&config, &hosts, &relay_state, &cache, &stats);
+    dns_stats_log_summary(&stats);
 
     hosts_table_free(&hosts);
     return result == 0 ? 0 : 1;

@@ -54,6 +54,9 @@ static int try_send_cached_response(net_loop_context_t* loop,
     int cache_result = dns_cache_get(loop->cache, &key, time(NULL), response,
                                      response_len, &response_len);
     if (cache_result == 0) {
+        if (loop->stats != NULL) {
+            loop->stats->cache_hits++;
+        }
         // cache hit
         if (dns_packet_set_id(response, response_len, request->query.id) != 0) {
             logger_error("Failed to set client ID in cached response");
@@ -66,9 +69,15 @@ static int try_send_cached_response(net_loop_context_t* loop,
                          strerror(errno));
             return 1;  // hit，但回客户端失败，退回上游路径也解决不了这个失败
         }
+        if (loop->stats != NULL) {
+            loop->stats->responses_sent++;
+        }
         return 1;  // indicate cache hit
     }
     if (cache_result == -1) {
+        if (loop->stats != NULL) {
+            loop->stats->cache_misses++;
+        }
         logger_debug("Cache miss for domain %s", request->query.qname);
     }
     if (cache_result == -2) {
@@ -110,6 +119,9 @@ static void handle_client_query_miss(net_loop_context_t* loop,
         relay_state_remove(loop->relay_state, forward_id);
         return;
     }
+    if (loop->stats != NULL) {
+        loop->stats->forwarded_queries++;
+    }
     logger_debug(
         "Forwarded query with forward ID %u (client ID %u) to upstream",
         forward_id, client_id);
@@ -142,6 +154,9 @@ static void handle_upstream_response(net_loop_context_t* loop) {
         logger_error("recv() from upstream failed: %s", strerror(errno));
         return;
     }
+    if (loop->stats != NULL) {
+        loop->stats->upstream_responses++;
+    }
 
     uint16_t forward_id = dns_packet_get_id(response, (size_t)response_size);
 
@@ -149,6 +164,9 @@ static void handle_upstream_response(net_loop_context_t* loop) {
     pending_query_t* pending = relay_state_find(loop->relay_state, forward_id);
     if (pending == NULL) {
         // 可能是迟到响应、未知响应、已经超时清理
+        if (loop->stats != NULL) {
+            loop->stats->unknown_or_late_responses++;
+        }
         logger_warning("Received response with unknown forward ID: %u",
                        forward_id);
         return;
@@ -175,6 +193,8 @@ static void handle_upstream_response(net_loop_context_t* loop) {
                (const struct sockaddr*)&pending->client_addr,
                pending->client_addr_len) < 0) {
         logger_error("sendto() to client failed: %s", strerror(errno));
+    } else if (loop->stats != NULL) {
+        loop->stats->responses_sent++;
     }
 
     logger_debug(
@@ -229,6 +249,8 @@ static void send_local_response(net_loop_context_t* loop,
                (const struct sockaddr*)&request->client_addr,
                request->client_addr_len) < 0) {
         logger_error("sendto() failed: %s", strerror(errno));
+    } else if (loop->stats != NULL) {
+        loop->stats->responses_sent++;
     }
 
     logger_debug("Sent local response to client for domain %s (kind: %d)",
@@ -247,9 +269,15 @@ static void handle_client_query(net_loop_context_t* loop) {
         return;
     }
     request.packet_len = (size_t)query_size;
+    if (loop->stats != NULL) {
+        loop->stats->queries_total++;
+    }
 
     if (dns_packet_parse_query(request.packet, request.packet_len,
                                &request.query) != 0) {
+        if (loop->stats != NULL) {
+            loop->stats->invalid_queries++;
+        }
         logger_error("Invalid DNS query");
         return;
     }
@@ -275,6 +303,13 @@ static void handle_client_query(net_loop_context_t* loop) {
     if (lookup_result.kind != HOSTS_LOOKUP_MISS &&
         request.query.qtype == DNS_TYPE_A &&
         request.query.qclass == DNS_CLASS_IN) {
+        if (loop->stats != NULL) {
+            if (lookup_result.kind == HOSTS_LOOKUP_ADDRESS) {
+                loop->stats->local_address_hits++;
+            } else if (lookup_result.kind == HOSTS_LOOKUP_BLOCKED) {
+                loop->stats->blocked_hits++;
+            }
+        }
         send_local_response(loop, &request, lookup_result);
         return;
     }
@@ -410,7 +445,10 @@ int net_loop_run(const relay_config_t* config,
             handle_upstream_response(&loop);
         }
 
-        relay_state_expire(relay_state, time(NULL));
+        size_t expired_count = relay_state_expire(relay_state, time(NULL));
+        if (stats != NULL) {
+            stats->expired_pending += expired_count;
+        }
     }
 
     return 0;

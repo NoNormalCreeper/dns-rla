@@ -137,8 +137,9 @@ void relay_state_remove(relay_state_t* state, uint16_t forward_id) {
     }
 }
 
-void relay_state_expire(relay_state_t* state, time_t now) {
+size_t relay_state_expire(relay_state_t* state, time_t now) {
     size_t i;
+    size_t expired_count = 0;
 
     /*
      * UDP 可能丢包，上游 DNS 也可能不响应。
@@ -162,7 +163,10 @@ void relay_state_expire(relay_state_t* state, time_t now) {
                     client_addr_buf);
             }
 
+            expired_count++;
             memset(query, 0, sizeof(*query));
         }
     }
+
+    return expired_count;
 }

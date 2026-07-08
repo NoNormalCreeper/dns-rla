@@ -95,6 +95,6 @@ void relay_state_remove(relay_state_t* state, uint16_t forward_id);
  * 超时后如果外部响应迟到，relay_state_find() 会找不到记录，net_loop
  * 应直接丢弃。
  */
-void relay_state_expire(relay_state_t* state, time_t now);
+size_t relay_state_expire(relay_state_t* state, time_t now);
 
 #endif

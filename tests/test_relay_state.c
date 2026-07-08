@@ -99,6 +99,7 @@ static void test_expire_removes_only_timed_out_entries(void) {
     pending_query_t* expired;
     pending_query_t* active;
     time_t now = 1000;
+    size_t expired_count = 0;
 
     relay_state_init(&state);
 
@@ -121,8 +122,9 @@ static void test_expire_removes_only_timed_out_entries(void) {
     expired->created_at = now - DNS_RELAY_PENDING_TIMEOUT_SEC - 1;
     active->created_at = now;
 
-    relay_state_expire(&state, now);
+    expired_count = relay_state_expire(&state, now);
 
+    TEST_CHECK_EQ_SIZE(expired_count, 1);
     TEST_CHECK(relay_state_find(&state, 0x3333) == NULL);
     TEST_CHECK(relay_state_find(&state, 0x4444) != NULL);
 }
