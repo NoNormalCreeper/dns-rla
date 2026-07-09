@@ -72,6 +72,29 @@ static void test_put_then_get_round_trips_response(void) {
     TEST_CHECK_EQ_INT(memcmp(fetched, stored, sizeof(stored)), 0);
 }
 
+static void test_repeated_put_in_place_updates_response(void) {
+    dns_cache_t cache;
+    dns_cache_key_t key = make_key("www.example.com", DNS_TYPE_A, DNS_CLASS_IN);
+    ubyte first[16];
+    ubyte second[16];
+    ubyte fetched[16];
+    size_t fetched_len = 0;
+
+    dns_cache_init(&cache);
+    fill_response(first, sizeof(first), 0x10);
+    fill_response(second, sizeof(second), 0x20);
+
+    TEST_CHECK_EQ_INT(dns_cache_put(&cache, &key, first, sizeof(first), 100),
+                      0);
+    TEST_CHECK_EQ_INT(dns_cache_put(&cache, &key, second, sizeof(second), 150),
+                      0);
+    TEST_CHECK_EQ_INT(
+        dns_cache_get(&cache, &key, 50, fetched, sizeof(fetched), &fetched_len),
+        0);
+    TEST_CHECK_EQ_SIZE(fetched_len, sizeof(second));
+    TEST_CHECK_EQ_INT(memcmp(fetched, second, sizeof(second)), 0);
+}
+
 static void test_get_distinguishes_qname_qtype_and_qclass(void) {
     dns_cache_t cache;
     dns_cache_key_t base =
@@ -196,6 +219,7 @@ int main(void) {
     test_init_clears_all_entries();
     test_get_misses_on_empty_cache();
     test_put_then_get_round_trips_response();
+    test_repeated_put_in_place_updates_response();
     test_get_distinguishes_qname_qtype_and_qclass();
     test_expired_entry_is_treated_as_miss();
     test_get_reports_needed_length_when_buffer_is_too_small();
