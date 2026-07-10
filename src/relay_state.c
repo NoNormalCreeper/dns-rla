@@ -57,7 +57,17 @@ int relay_state_add(relay_state_t* state,
                     const char* qname,
                     uint16_t qtype,
                     uint16_t qclass) {
+    size_t qname_len;
+
     if (client_addr_len > sizeof(((pending_query_t*)0)->client_addr)) {
+        return -1;
+    }
+    if (qname == NULL) {
+        return -1;
+    }
+
+    qname_len = strnlen(qname, sizeof(((pending_query_t*)0)->qname));
+    if (qname_len == sizeof(((pending_query_t*)0)->qname)) {
         return -1;
     }
 
@@ -84,7 +94,7 @@ int relay_state_add(relay_state_t* state,
             slot->qclass = qclass;
             slot->created_at = time(NULL);
             memcpy(&slot->client_addr, client_addr, client_addr_len);
-            memcpy(slot->qname, qname, DNS_MAX_DOMAIN_LEN + 1);
+            memcpy(slot->qname, qname, qname_len + 1);
             char client_addr_buf[48];
 
             if (socketaddr_to_string((const struct sockaddr*)&slot->client_addr,

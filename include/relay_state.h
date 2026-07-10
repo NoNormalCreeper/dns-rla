@@ -74,7 +74,10 @@ void relay_state_init(relay_state_t* state);
  */
 int relay_state_next_id(relay_state_t* state, uint16_t* out_id);
 
-/* 添加一条“forward_id -> 原客户端”的映射。 */
+/*
+ * 添加一条“forward_id -> 原客户端”的映射。
+ * qname 必须是非 NULL、以 '\0' 结尾且不超过 DNS_MAX_DOMAIN_LEN 的域名。
+ */
 int relay_state_add(relay_state_t* state,
                     uint16_t forward_id,
                     uint16_t client_id,

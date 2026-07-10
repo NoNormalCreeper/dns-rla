@@ -129,6 +129,22 @@ static void test_expire_removes_only_timed_out_entries(void) {
     TEST_CHECK(relay_state_find(&state, 0x4444) != NULL);
 }
 
+static void test_add_rejects_qname_longer_than_dns_limit(void) {
+    relay_state_t state;
+    struct sockaddr_in client = make_ipv4_client("192.0.2.19", 53019);
+    char qname[DNS_MAX_DOMAIN_LEN + 2];
+
+    memset(qname, 'a', sizeof(qname) - 1);
+    qname[sizeof(qname) - 1] = '\0';
+    relay_state_init(&state);
+
+    TEST_CHECK_EQ_INT(
+        relay_state_add(&state, 0x5555, 0x0303, (const struct sockaddr*)&client,
+                        sizeof(client), qname, DNS_TYPE_A, DNS_CLASS_IN),
+        -1);
+    TEST_CHECK(relay_state_find(&state, 0x5555) == NULL);
+}
+
 static void test_add_fails_when_pending_table_is_full(void) {
     relay_state_t state;
     struct sockaddr_in client = make_ipv4_client("192.0.2.20", 53020);
@@ -156,6 +172,7 @@ int main(void) {
     test_next_id_wraps_without_returning_zero();
     test_add_find_and_remove_preserve_client_info();
     test_expire_removes_only_timed_out_entries();
+    test_add_rejects_qname_longer_than_dns_limit();
     test_add_fails_when_pending_table_is_full();
 
     return 0;

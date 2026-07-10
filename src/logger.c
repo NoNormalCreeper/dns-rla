@@ -17,6 +17,10 @@ static void logger_vprint(FILE* stream,
                           const char* prefix,
                           const char* fmt,
                           va_list args) {
+    if (fmt == NULL) {
+        return;
+    }
+
     /* 日志统一在这里拼前缀和换行，避免每个调用点重复写格式。 */
     time_t rawtime;
     struct tm* timeinfo;
