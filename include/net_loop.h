@@ -24,4 +24,7 @@ int net_loop_run(const relay_config_t* config,
                  dns_cache_t* cache,
                  dns_stats_t* stats);
 
+/* 可从 SIGINT 处理函数调用；事件循环会在当前轮结束后正常退出。 */
+void net_loop_request_stop(void);
+
 #endif

@@ -4,6 +4,13 @@
 #include "net_loop.h"
 #include "relay_state.h"
 
+#include <signal.h>
+
+static void handle_sigint(int signal_number) {
+    (void)signal_number;
+    net_loop_request_stop();
+}
+
 int main(int argc, char** argv) {
     relay_config_t config;
     hosts_table_t hosts;
@@ -44,7 +51,13 @@ int main(int argc, char** argv) {
     dns_cache_init(&cache);
     dns_stats_init(&stats);
 
-    /* 当前 net_loop 还是骨架；后续真正的 UDP/select 主循环会在这里阻塞运行。 */
+    if (signal(SIGINT, handle_sigint) == SIG_ERR) {
+        logger_error("failed to install SIGINT handler");
+        hosts_table_free(&hosts);
+        return 1;
+    }
+
+    /* SIGINT 会让事件循环正常返回，以便打印统计并释放资源。 */
     result = net_loop_run(&config, &hosts, &relay_state, &cache, &stats);
     dns_stats_log_summary(&stats);
 

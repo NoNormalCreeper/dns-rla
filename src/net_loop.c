@@ -2,6 +2,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -38,6 +39,16 @@ typedef struct {
 
     dns_query_t query;
 } client_query_t;
+
+static volatile sig_atomic_t stop_requested = 0;
+
+void net_loop_request_stop(void) {
+    stop_requested = 1;
+}
+
+static int is_cacheable_query(uint16_t qtype, uint16_t qclass) {
+    return qtype == DNS_TYPE_A && qclass == DNS_CLASS_IN;
+}
 
 /* 1=hit, 0=miss */
 static int try_send_cached_response(net_loop_context_t* loop,
@@ -132,6 +143,11 @@ static void write_upstream_cache(net_loop_context_t* loop,
                                  ssize_t response_size,
                                  const pending_query_t* query) {
     uint32_t out_ttl_sec;
+
+    if (!is_cacheable_query(query->qtype, query->qclass)) {
+        return;
+    }
+
     if (dns_packet_extract_cache_ttl(response, response_size, &out_ttl_sec) <
         0) {
         logger_debug(
@@ -314,7 +330,8 @@ static void handle_client_query(net_loop_context_t* loop) {
         return;
     }
 
-    if (try_send_cached_response(loop, &request) == 1) {
+    if (is_cacheable_query(request.query.qtype, request.query.qclass) &&
+        try_send_cached_response(loop, &request) == 1) {
         return;
     }
 
@@ -414,7 +431,7 @@ int net_loop_run(const relay_config_t* config,
         return -1;
     }
 
-    while (1) {
+    while (!stop_requested) {
         fd_set read_fds;
         int max_fd = local_sock > upstream_sock ? local_sock : upstream_sock;
         struct timeval timeout = {.tv_sec = 1,
@@ -425,11 +442,11 @@ int net_loop_run(const relay_config_t* config,
         FD_SET(upstream_sock, &read_fds);
 
         if (select(max_fd + 1, &read_fds, NULL, NULL, &timeout) < 0) {
-            logger_error("select() failed: %s", strerror(errno));
             if (errno == EINTR) {
-                continue;  // Interrupted by signal, retry
+                continue;  // Interrupted by signal, re-check stop_requested
             }
 
+            logger_error("select() failed: %s", strerror(errno));
             close(local_sock);
             close(upstream_sock);
             return -1;
@@ -451,5 +468,7 @@ int net_loop_run(const relay_config_t* config,
         }
     }
 
+    close(local_sock);
+    close(upstream_sock);
     return 0;
 }
